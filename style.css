@@ -80,6 +80,7 @@ body {
 .game-shell {
   display: grid;
   place-items: center;
+  gap: 14px;
 }
 
 .game-area {
@@ -302,6 +303,34 @@ body {
   display: none;
 }
 
+.touch-controls {
+  width: min(92vw, 420px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.touch-button {
+  min-height: 58px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  touch-action: manipulation;
+}
+
+.touch-button:active {
+  transform: translateY(1px);
+  background: rgba(255, 209, 102, 0.18);
+}
+
+.boost-button {
+  color: #ffe08a;
+}
+
 @media (max-width: 480px) {
   .hud {
     gap: 14px;
@@ -315,6 +344,10 @@ body {
 
   .game-area {
     height: 560px;
+  }
+
+  .touch-controls {
+    gap: 10px;
   }
 
   .vehicle-picker {

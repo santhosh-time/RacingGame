@@ -5,6 +5,8 @@ const speedDisplay = document.getElementById("speedDisplay");
 const startButton = document.getElementById("startButton");
 const message = document.getElementById("message");
 const vehicleOptions = Array.from(document.querySelectorAll(".vehicle-option"));
+const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
+const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
 
 const gameBounds = {
@@ -184,6 +186,12 @@ function removeBoostLevel() {
   refreshSpeed();
 }
 
+function setControlState(controlName, pressed) {
+  if (controlName in state.keys) {
+    state.keys[controlName] = pressed;
+  }
+}
+
 function updateRoadLines() {
   roadLines.forEach((line) => {
     const currentTop = parseFloat(line.style.top || line.offsetTop);
@@ -351,7 +359,7 @@ startButton.addEventListener("click", startGame);
 
 window.addEventListener("keydown", (event) => {
   if (event.key in state.keys) {
-    state.keys[event.key] = true;
+    setControlState(event.key, true);
     event.preventDefault();
   }
 
@@ -362,7 +370,36 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("keyup", (event) => {
   if (event.key in state.keys) {
-    state.keys[event.key] = false;
+    setControlState(event.key, false);
     event.preventDefault();
   }
+});
+
+touchHoldButtons.forEach((button) => {
+  const controlName = button.dataset.touchControl;
+
+  const pressStart = (event) => {
+    event.preventDefault();
+    setControlState(controlName, true);
+  };
+
+  const pressEnd = (event) => {
+    event.preventDefault();
+    setControlState(controlName, false);
+  };
+
+  button.addEventListener("pointerdown", pressStart);
+  button.addEventListener("pointerup", pressEnd);
+  button.addEventListener("pointerleave", pressEnd);
+  button.addEventListener("pointercancel", pressEnd);
+});
+
+touchTapButtons.forEach((button) => {
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+
+    if (button.dataset.touchTap === "ArrowDown") {
+      removeBoostLevel();
+    }
+  });
 });
