@@ -54,6 +54,7 @@ const state = {
   nextBoosterScore: 1000,
   animationId: 0,
   soundEnabled: true,
+  enemyRespawns: 0,
 };
 
 const audioState = {
@@ -62,6 +63,7 @@ const audioState = {
   engineGain: null,
   engineOscillator: null,
   engineStarted: false,
+  primeNode: null,
 };
 
 function syncGameBounds() {
@@ -100,6 +102,23 @@ async function ensureAudioReady() {
   }
 
   return context;
+}
+
+async function primeMobileAudio() {
+  const context = await ensureAudioReady();
+  if (!context || audioState.primeNode) {
+    return;
+  }
+
+  const silentGain = context.createGain();
+  const silentOscillator = context.createOscillator();
+  silentGain.gain.value = 0.00001;
+  silentOscillator.frequency.value = 220;
+  silentOscillator.connect(silentGain);
+  silentGain.connect(audioState.masterGain);
+  silentOscillator.start();
+  silentOscillator.stop(context.currentTime + 0.02);
+  audioState.primeNode = true;
 }
 
 async function startEngineSound() {
@@ -222,9 +241,33 @@ function middleLaneX() {
   return lanes[Math.floor(lanes.length / 2) - 1];
 }
 
+function playerLaneX() {
+  const lanes = lanePositions();
+  return lanes.reduce((closest, lane) =>
+    Math.abs(lane - state.playerX) < Math.abs(closest - state.playerX) ? lane : closest
+  );
+}
+
 function randomLane(excludedLanes = []) {
   const lanes = lanePositions().filter((lane) => !excludedLanes.includes(lane));
   const choices = lanes.length > 0 ? lanes : lanePositions();
+  return choices[Math.floor(Math.random() * choices.length)];
+}
+
+function chooseEnemyLane(excludedLanes = [], preferPlayerLane = false) {
+  const lanes = lanePositions();
+  const availableLanes = lanes.filter((lane) => !excludedLanes.includes(lane));
+  const choices = availableLanes.length > 0 ? availableLanes : lanes;
+  const targetLane = playerLaneX();
+
+  if (preferPlayerLane && choices.includes(targetLane)) {
+    return targetLane;
+  }
+
+  if (choices.includes(targetLane) && Math.random() < 0.45) {
+    return targetLane;
+  }
+
   return choices[Math.floor(Math.random() * choices.length)];
 }
 
@@ -274,11 +317,13 @@ function createEnemy(y, left) {
 
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
-  const firstLane = randomLane();
-  const secondLane = randomLane([firstLane]);
+  const firstLane = chooseEnemyLane([], true);
+  const secondLane = chooseEnemyLane([firstLane], false);
+  const thirdLane = chooseEnemyLane([firstLane, secondLane], false);
   state.enemies = [
     createEnemy(-160, firstLane),
-    createEnemy(-390, secondLane),
+    createEnemy(-360, secondLane),
+    createEnemy(-560, thirdLane),
   ];
 }
 
@@ -399,10 +444,12 @@ function updateEnemies() {
 
     if (nextTop > gameBounds.height) {
       nextTop = -220;
+      state.enemyRespawns += 1;
       const occupiedLanes = state.enemies
         .filter((item) => item !== enemy)
         .map((item) => parseFloat(item.style.left));
-      enemy.style.left = `${randomLane(occupiedLanes)}px`;
+      const forcePlayerLane = state.enemyRespawns % 2 === 0;
+      enemy.style.left = `${chooseEnemyLane(occupiedLanes, forcePlayerLane)}px`;
     }
 
     enemy.style.top = `${nextTop}px`;
@@ -458,6 +505,7 @@ function gameLoop() {
 async function startGame() {
   cancelAnimationFrame(state.animationId);
   syncGameBounds();
+  await primeMobileAudio();
   await startEngineSound();
   state.active = true;
   state.score = 0;
@@ -466,6 +514,7 @@ async function startGame() {
   state.boostLevel = 0;
   state.playerX = middleLaneX();
   state.nextBoosterScore = 1000;
+  state.enemyRespawns = 0;
 
   roadLines.forEach((line, index) => {
     line.style.top = `${20 + index * 160}px`;
@@ -514,6 +563,7 @@ updateSoundButton();
 startButton.addEventListener("click", startGame);
 
 soundButton.addEventListener("click", async () => {
+  await primeMobileAudio();
   state.soundEnabled = !state.soundEnabled;
   updateSoundButton();
 
@@ -570,6 +620,17 @@ touchTapButtons.forEach((button) => {
       removeBoostLevel();
     }
   });
+});
+
+["pointerdown", "touchstart"].forEach((eventName) => {
+  window.addEventListener(eventName, () => {
+    primeMobileAudio();
+
+    if (state.soundEnabled && state.active) {
+      startEngineSound();
+      updateEngineSound();
+    }
+  }, { passive: true });
 });
 
 window.addEventListener("resize", () => {
