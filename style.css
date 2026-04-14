@@ -78,6 +78,23 @@ body {
   background: linear-gradient(135deg, var(--accent), #ffb703);
 }
 
+.hud-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.sound-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .game-shell {
   display: grid;
   place-items: center;
@@ -356,6 +373,17 @@ body {
     grid-column: 1 / -1;
     width: 100%;
     min-height: 48px;
+  }
+
+  .hud-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .sound-button {
+    width: 100%;
+    min-height: 44px;
   }
 
   .game-area {

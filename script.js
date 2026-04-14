@@ -2,6 +2,7 @@ const gameArea = document.getElementById("gameArea");
 const playerCar = document.getElementById("playerCar");
 const scoreDisplay = document.getElementById("score");
 const speedDisplay = document.getElementById("speedDisplay");
+const soundButton = document.getElementById("soundButton");
 const startButton = document.getElementById("startButton");
 const message = document.getElementById("message");
 const vehicleOptions = Array.from(document.querySelectorAll(".vehicle-option"));
@@ -52,11 +53,147 @@ const state = {
   booster: null,
   nextBoosterScore: 1000,
   animationId: 0,
+  soundEnabled: true,
+};
+
+const audioState = {
+  context: null,
+  masterGain: null,
+  engineGain: null,
+  engineOscillator: null,
+  engineStarted: false,
 };
 
 function syncGameBounds() {
   gameBounds.width = gameArea.clientWidth;
   gameBounds.height = gameArea.clientHeight;
+}
+
+function updateSoundButton() {
+  soundButton.textContent = `Sound: ${state.soundEnabled ? "On" : "Off"}`;
+}
+
+function getAudioContext() {
+  if (!audioState.context) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return null;
+    }
+
+    audioState.context = new AudioContextClass();
+    audioState.masterGain = audioState.context.createGain();
+    audioState.masterGain.gain.value = 0.14;
+    audioState.masterGain.connect(audioState.context.destination);
+  }
+
+  return audioState.context;
+}
+
+async function ensureAudioReady() {
+  const context = getAudioContext();
+  if (!context) {
+    return null;
+  }
+
+  if (context.state === "suspended") {
+    await context.resume();
+  }
+
+  return context;
+}
+
+async function startEngineSound() {
+  if (!state.soundEnabled) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context || audioState.engineStarted) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  oscillator.type = state.selectedVehicle.startsWith("bike-") ? "sawtooth" : "square";
+  oscillator.frequency.value = state.selectedVehicle.startsWith("bike-") ? 120 : 82;
+  gainNode.gain.value = 0.0001;
+  oscillator.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  oscillator.start();
+
+  audioState.engineOscillator = oscillator;
+  audioState.engineGain = gainNode;
+  audioState.engineStarted = true;
+}
+
+function stopEngineSound() {
+  if (!audioState.engineStarted) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  audioState.engineGain.gain.cancelScheduledValues(now);
+  audioState.engineGain.gain.setTargetAtTime(0.0001, now, 0.08);
+}
+
+function updateEngineSound() {
+  if (!audioState.engineStarted || !state.soundEnabled) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  const baseFrequency = state.selectedVehicle.startsWith("bike-") ? 120 : 82;
+  const steerBoost = state.keys.ArrowLeft || state.keys.ArrowRight ? 10 : 0;
+  const targetFrequency = baseFrequency + state.currentSpeed * 10 + steerBoost;
+  const targetGain = state.active ? 0.065 : 0.0001;
+
+  audioState.engineOscillator.frequency.cancelScheduledValues(now);
+  audioState.engineOscillator.frequency.linearRampToValueAtTime(targetFrequency, now + 0.08);
+  audioState.engineGain.gain.cancelScheduledValues(now);
+  audioState.engineGain.gain.setTargetAtTime(targetGain, now, 0.08);
+}
+
+async function playToneSweep(options) {
+  if (!state.soundEnabled) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  oscillator.type = options.type;
+  oscillator.frequency.setValueAtTime(options.startFrequency, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(options.endFrequency, context.currentTime + options.duration);
+  gainNode.gain.setValueAtTime(options.volume, context.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + options.duration);
+  oscillator.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  oscillator.start();
+  oscillator.stop(context.currentTime + options.duration);
+}
+
+function playBoosterSound() {
+  playToneSweep({
+    type: "triangle",
+    startFrequency: 320,
+    endFrequency: 980,
+    duration: 0.28,
+    volume: 0.12,
+  });
+}
+
+function playCrashSound() {
+  playToneSweep({
+    type: "sawtooth",
+    startFrequency: 210,
+    endFrequency: 58,
+    duration: 0.45,
+    volume: 0.16,
+  });
 }
 
 function vehicleWidth() {
@@ -115,6 +252,10 @@ function applyVehicleSelection(vehicleName) {
   if (!state.active) {
     state.playerX = middleLaneX();
     playerCar.style.left = `${state.playerX}px`;
+  }
+
+  if (audioState.engineStarted) {
+    audioState.engineOscillator.type = state.selectedVehicle.startsWith("bike-") ? "sawtooth" : "square";
   }
 }
 
@@ -185,6 +326,7 @@ function updateBoosterLaneSafety() {
 function addBoostLevel() {
   state.boostLevel += 1;
   refreshSpeed();
+  playBoosterSound();
 }
 
 function removeBoostLevel() {
@@ -306,15 +448,17 @@ function gameLoop() {
   spawnBooster();
   updateEnemies();
   updateBooster();
+  updateEngineSound();
 
   state.score += 1;
   scoreDisplay.textContent = String(state.score);
   state.animationId = requestAnimationFrame(gameLoop);
 }
 
-function startGame() {
+async function startGame() {
   cancelAnimationFrame(state.animationId);
   syncGameBounds();
+  await startEngineSound();
   state.active = true;
   state.score = 0;
   state.baseSpeed = 4.8;
@@ -342,6 +486,8 @@ function startGame() {
 function endGame() {
   state.active = false;
   cancelAnimationFrame(state.animationId);
+  stopEngineSound();
+  playCrashSound();
   message.innerHTML = `
     <h2>Crash!</h2>
     <p>Your score: ${state.score}</p>
@@ -363,8 +509,21 @@ applyVehicleSelection(state.selectedVehicle);
 syncGameBounds();
 refreshSpeed();
 syncVehiclePreviewVisibility();
+updateSoundButton();
 
 startButton.addEventListener("click", startGame);
+
+soundButton.addEventListener("click", async () => {
+  state.soundEnabled = !state.soundEnabled;
+  updateSoundButton();
+
+  if (state.soundEnabled) {
+    await startEngineSound();
+    updateEngineSound();
+  } else {
+    stopEngineSound();
+  }
+});
 
 window.addEventListener("keydown", (event) => {
   if (event.key in state.keys) {
