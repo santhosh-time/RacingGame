@@ -31,7 +31,6 @@ const vehicleClasses = [
 ];
 const roadWidthMeters = 14;
 const targetFramesPerSecond = 60;
-const metersPerPixel = roadWidthMeters / gameBounds.width;
 const boosterSpawnTop = -140;
 const boosterCollectionZoneTop = 340;
 const boosterSafetyDistance = 170;
@@ -55,11 +54,17 @@ const state = {
   animationId: 0,
 };
 
+function syncGameBounds() {
+  gameBounds.width = gameArea.clientWidth;
+  gameBounds.height = gameArea.clientHeight;
+}
+
 function vehicleWidth() {
   return state.selectedVehicle.startsWith("bike-") ? gameBounds.bikeWidth : gameBounds.carWidth;
 }
 
 function refreshSpeed() {
+  const metersPerPixel = roadWidthMeters / gameBounds.width;
   state.currentSpeed = state.baseSpeed * (boostMultiplier ** state.boostLevel);
   const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
   const kmph = Math.round(metersPerSecond * 3.6);
@@ -67,10 +72,11 @@ function refreshSpeed() {
 }
 
 function lanePositions(width = gameBounds.carWidth) {
-  const usableWidth = gameBounds.width - gameBounds.roadPadding * 2 - width;
+  const roadPadding = Math.min(gameBounds.roadPadding, Math.max(14, gameBounds.width * 0.06));
+  const usableWidth = gameBounds.width - roadPadding * 2 - width;
   const gap = usableWidth / (laneCount - 1);
   return Array.from({ length: laneCount }, (_, index) =>
-    Math.round(gameBounds.roadPadding + gap * index)
+    Math.round(roadPadding + gap * index)
   );
 }
 
@@ -294,6 +300,7 @@ function gameLoop() {
     return;
   }
 
+  syncGameBounds();
   updateRoadLines();
   updatePlayer();
   spawnBooster();
@@ -307,6 +314,7 @@ function gameLoop() {
 
 function startGame() {
   cancelAnimationFrame(state.animationId);
+  syncGameBounds();
   state.active = true;
   state.score = 0;
   state.baseSpeed = 4.8;
@@ -352,6 +360,7 @@ vehicleOptions.forEach((option) => {
 });
 
 applyVehicleSelection(state.selectedVehicle);
+syncGameBounds();
 refreshSpeed();
 syncVehiclePreviewVisibility();
 
@@ -402,4 +411,17 @@ touchTapButtons.forEach((button) => {
       removeBoostLevel();
     }
   });
+});
+
+window.addEventListener("resize", () => {
+  syncGameBounds();
+  if (!state.active) {
+    state.playerX = middleLaneX();
+    playerCar.style.left = `${state.playerX}px`;
+  } else {
+    const maxX = gameBounds.width - vehicleWidth();
+    state.playerX = Math.max(0, Math.min(maxX, state.playerX));
+    playerCar.style.left = `${state.playerX}px`;
+  }
+  refreshSpeed();
 });
