@@ -6,16 +6,10 @@ const speedDisplay = document.getElementById("speedDisplay");
 const soundButton = document.getElementById("soundButton");
 const startButton = document.getElementById("startButton");
 const message = document.getElementById("message");
-const racerGate = document.getElementById("racerGate");
-const vehicleSetup = document.getElementById("vehicleSetup");
-const racerForm = document.getElementById("racerForm");
-const racerNameInput = document.getElementById("racerNameInput");
-const setupStatus = document.getElementById("setupStatus");
-const sessionModeText = document.getElementById("sessionModeText");
-const vehicleOptions = Array.from(document.querySelectorAll(".vehicle-option"));
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
+const initialMessageMarkup = message.innerHTML;
 
 const gameBounds = {
   width: 420,
@@ -85,29 +79,102 @@ function updateBestScoreDisplay() {
   bestScoreDisplay.textContent = String(state.bestScore);
 }
 
+function overlayRefs() {
+  return {
+    racerGate: document.getElementById("racerGate"),
+    vehicleSetup: document.getElementById("vehicleSetup"),
+    racerForm: document.getElementById("racerForm"),
+    racerNameInput: document.getElementById("racerNameInput"),
+    setupStatus: document.getElementById("setupStatus"),
+    sessionModeText: document.getElementById("sessionModeText"),
+    vehicleOptions: Array.from(document.querySelectorAll(".vehicle-option")),
+  };
+}
+
 function updateSessionModeText() {
-  sessionModeText.textContent = `${state.racerName} is ready. Highest score is tracked for this session.`;
+  const { sessionModeText } = overlayRefs();
+  if (sessionModeText) {
+    sessionModeText.textContent = `${state.racerName} is ready. Highest score is tracked for this session.`;
+  }
 }
 
 function showVehicleSetup() {
+  const { racerGate, vehicleSetup, racerNameInput } = overlayRefs();
   racerGate.classList.add("hidden");
   vehicleSetup.classList.remove("hidden");
+  if (racerNameInput) {
+    racerNameInput.value = state.racerName === "Guest Racer" ? "" : state.racerName;
+  }
   updateSessionModeText();
   updateBestScoreDisplay();
 }
 
 function showAuthGate() {
+  const { racerGate, vehicleSetup } = overlayRefs();
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
 }
 
 function setSetupStatus(messageText) {
-  setupStatus.textContent = messageText;
+  const { setupStatus } = overlayRefs();
+  if (setupStatus) {
+    setupStatus.textContent = messageText;
+  }
 }
 
 function setRacerName(name) {
   state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
   showVehicleSetup();
+}
+
+function resetSessionForNewGame() {
+  state.active = false;
+  cancelAnimationFrame(state.animationId);
+  clearBooster();
+  state.score = 0;
+  state.bestScore = 0;
+  state.boostLevel = 0;
+  state.baseSpeed = 4.8;
+  state.currentSpeed = 4.8;
+  state.enemyRespawns = 0;
+  state.nextBoosterScore = 1000;
+  state.playerX = middleLaneX();
+  scoreDisplay.textContent = "0";
+  updateBestScoreDisplay();
+  refreshSpeed();
+  resetEnemies();
+  playerCar.style.left = `${state.playerX}px`;
+  roadLines.forEach((line, index) => {
+    line.style.top = `${20 + index * 160}px`;
+  });
+  message.innerHTML = initialMessageMarkup;
+  bindOverlayControls();
+  showVehicleSetup();
+  setSetupStatus(`Choose a vehicle for ${state.racerName}. Best score has been reset.`);
+  message.classList.remove("hidden");
+  syncVehiclePreviewVisibility();
+  startButton.textContent = "Start Game";
+}
+
+function bindOverlayControls() {
+  const { racerForm, racerNameInput, vehicleOptions } = overlayRefs();
+
+  vehicleOptions.forEach((option) => {
+    option.classList.toggle("selected", option.dataset.vehicle === state.selectedVehicle);
+    option.addEventListener("click", () => {
+      overlayRefs().vehicleOptions.forEach((item) => item.classList.remove("selected"));
+      option.classList.add("selected");
+      applyVehicleSelection(option.dataset.vehicle);
+    });
+  });
+
+  if (racerForm) {
+    racerForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      setRacerName(racerNameInput ? racerNameInput.value : "");
+      setSetupStatus(`Racer name locked: ${state.racerName}`);
+    });
+  }
 }
 
 function maybeUpdateBestScore() {
@@ -908,26 +975,15 @@ function endGame() {
     <p>Highest score this session: ${state.bestScore}</p>
     <div class="auth-actions">
       <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
-      <button id="closeCrashButton" class="auth-button secondary" type="button">Close</button>
+      <button id="newGameButton" class="auth-button secondary" type="button">New Game</button>
     </div>
-    <p>Press Restart Game to try again.</p>
+    <p>Press Restart Game to try again with the same vehicle, or choose New Game to reset best score and select another vehicle.</p>
   `;
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
   document.getElementById("downloadScoreCardButton").addEventListener("click", saveScoreCard);
-  document.getElementById("closeCrashButton").addEventListener("click", () => {
-    message.classList.add("hidden");
-    syncVehiclePreviewVisibility();
-  });
+  document.getElementById("newGameButton").addEventListener("click", resetSessionForNewGame);
 }
-
-vehicleOptions.forEach((option) => {
-  option.addEventListener("click", () => {
-    vehicleOptions.forEach((item) => item.classList.remove("selected"));
-    option.classList.add("selected");
-    applyVehicleSelection(option.dataset.vehicle);
-  });
-});
 
 applyVehicleSelection(state.selectedVehicle);
 syncGameBounds();
@@ -935,15 +991,10 @@ refreshSpeed();
 syncVehiclePreviewVisibility();
 updateSoundButton();
 updateBestScoreDisplay();
+bindOverlayControls();
 showAuthGate();
 
 startButton.addEventListener("click", startGame);
-
-racerForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  setRacerName(racerNameInput.value);
-  setSetupStatus(`Racer name locked: ${state.racerName}`);
-});
 
 soundButton.addEventListener("click", async () => {
   await primeMobileAudio();
