@@ -162,10 +162,14 @@ body {
   opacity: 0;
 }
 
-.enemy-car {
+.enemy-vehicle[class*="car-"] {
   width: 48px;
   height: 88px;
-  background-image: url("assets/enemy-car.svg");
+}
+
+.enemy-vehicle[class*="bike-"] {
+  width: 30px;
+  height: 84px;
 }
 
 .player-vehicle[class*="car-"],

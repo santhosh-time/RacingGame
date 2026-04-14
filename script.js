@@ -31,6 +31,16 @@ const vehicleClasses = [
   "car-electric",
   "car-truck",
 ];
+const enemyVehicleChoices = [
+  "bike-street",
+  "bike-speed",
+  "bike-dirt",
+  "bike-electric",
+  "car-sport",
+  "car-muscle",
+  "car-electric",
+  "car-truck",
+];
 const roadWidthMeters = 14;
 const targetFramesPerSecond = 60;
 const boosterSpawnTop = -140;
@@ -618,6 +628,16 @@ function roadPadding() {
   return 0;
 }
 
+function enemyVehicleWidth(vehicleName) {
+  return vehicleName.startsWith("bike-") ? gameBounds.bikeWidth : gameBounds.carWidth;
+}
+
+function pickEnemyVehicle() {
+  const choices = enemyVehicleChoices.filter((vehicleName) => vehicleName !== state.selectedVehicle);
+  const pool = choices.length > 0 ? choices : enemyVehicleChoices;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function laneCenters() {
   const padding = roadPadding();
   const usableWidth = gameBounds.width - padding * 2;
@@ -737,10 +757,13 @@ function syncVehiclePreviewVisibility() {
 }
 
 function createEnemy(y, left) {
+  const enemyVehicle = pickEnemyVehicle();
+  const width = enemyVehicleWidth(enemyVehicle);
   const enemy = document.createElement("div");
-  enemy.className = "vehicle enemy-car";
+  enemy.className = `vehicle enemy-vehicle ${enemyVehicle}`;
+  enemy.dataset.vehicle = enemyVehicle;
   enemy.style.top = `${y}px`;
-  enemy.style.left = `${left}px`;
+  enemy.style.left = `${clampVehicleLeft(left, width)}px`;
   gameArea.appendChild(enemy);
   return enemy;
 }
@@ -870,6 +893,7 @@ function isColliding(a, b) {
 function updateEnemies() {
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
+    const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
     let nextTop = top + state.currentSpeed + 1.2;
 
     if (nextTop > gameBounds.height) {
@@ -877,10 +901,24 @@ function updateEnemies() {
       state.enemyRespawns += 1;
       const occupiedLanes = state.enemies
         .filter((item) => item !== enemy)
-        .map((item) => parseFloat(item.style.left));
+        .map((item) => ({
+          left: parseFloat(item.style.left),
+          width: enemyVehicleWidth(item.dataset.vehicle || "car-sport"),
+        }));
       const forcePlayerLane = state.enemyRespawns % 2 === 0;
-      const nextLane = chooseEnemyX(occupiedLanes, forcePlayerLane);
-      enemy.style.left = `${nextLane}px`;
+      const nextLane = chooseEnemyX(
+        occupiedLanes.map((item) => item.left),
+        forcePlayerLane
+      );
+      const nextVehicle = pickEnemyVehicle();
+      const nextWidth = enemyVehicleWidth(nextVehicle);
+      const adjustedLeft = clampVehicleLeft(nextLane, nextWidth);
+      const overlapsExisting = occupiedLanes.some((item) =>
+        positionsOverlap(adjustedLeft, nextWidth, item.left, item.width, 20)
+      );
+      enemy.dataset.vehicle = nextVehicle;
+      enemy.className = `vehicle enemy-vehicle ${nextVehicle}`;
+      enemy.style.left = `${overlapsExisting ? clampVehicleLeft(nextLane, enemyWidth) : adjustedLeft}px`;
     }
 
     enemy.style.top = `${nextTop}px`;
