@@ -18,7 +18,7 @@ const gameBounds = {
   bikeWidth: 30,
 };
 
-const laneCount = 4;
+const laneCount = 5;
 const boostMultiplier = 1.5;
 const vehicleClasses = [
   "bike-street",
