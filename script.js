@@ -518,6 +518,21 @@ async function primeMobileAudio() {
   audioState.primeNode = true;
 }
 
+function engineSoundProfile(vehicleName) {
+  const profiles = {
+    "bike-street": { wave: "sawtooth", baseFrequency: 126, steerBoost: 12, activeGain: 0.065, speedFactor: 10.5 },
+    "bike-speed": { wave: "sawtooth", baseFrequency: 138, steerBoost: 14, activeGain: 0.072, speedFactor: 11.8 },
+    "bike-dirt": { wave: "square", baseFrequency: 112, steerBoost: 11, activeGain: 0.068, speedFactor: 9.6 },
+    "bike-electric": { wave: "triangle", baseFrequency: 176, steerBoost: 7, activeGain: 0.05, speedFactor: 8.2 },
+    "car-sport": { wave: "sawtooth", baseFrequency: 96, steerBoost: 10, activeGain: 0.062, speedFactor: 9.1 },
+    "car-muscle": { wave: "square", baseFrequency: 78, steerBoost: 8, activeGain: 0.075, speedFactor: 8.3 },
+    "car-electric": { wave: "triangle", baseFrequency: 146, steerBoost: 6, activeGain: 0.046, speedFactor: 7.2 },
+    "car-truck": { wave: "square", baseFrequency: 62, steerBoost: 5, activeGain: 0.082, speedFactor: 6.5 },
+  };
+
+  return profiles[vehicleName] || profiles["car-sport"];
+}
+
 async function startEngineSound() {
   if (!state.soundEnabled) {
     return;
@@ -528,10 +543,11 @@ async function startEngineSound() {
     return;
   }
 
+  const profile = engineSoundProfile(state.selectedVehicle);
   const oscillator = context.createOscillator();
   const gainNode = context.createGain();
-  oscillator.type = state.selectedVehicle.startsWith("bike-") ? "sawtooth" : "square";
-  oscillator.frequency.value = state.selectedVehicle.startsWith("bike-") ? 120 : 82;
+  oscillator.type = profile.wave;
+  oscillator.frequency.value = profile.baseFrequency;
   gainNode.gain.value = 0.0001;
   oscillator.connect(gainNode);
   gainNode.connect(audioState.masterGain);
@@ -558,10 +574,10 @@ function updateEngineSound() {
   }
 
   const now = audioState.context.currentTime;
-  const baseFrequency = state.selectedVehicle.startsWith("bike-") ? 120 : 82;
-  const steerBoost = state.keys.ArrowLeft || state.keys.ArrowRight ? 10 : 0;
-  const targetFrequency = baseFrequency + state.currentSpeed * 10 + steerBoost;
-  const targetGain = state.active ? 0.065 : 0.0001;
+  const profile = engineSoundProfile(state.selectedVehicle);
+  const steerBoost = state.keys.ArrowLeft || state.keys.ArrowRight ? profile.steerBoost : 0;
+  const targetFrequency = profile.baseFrequency + state.currentSpeed * profile.speedFactor + steerBoost;
+  const targetGain = state.active ? profile.activeGain : 0.0001;
 
   audioState.engineOscillator.frequency.cancelScheduledValues(now);
   audioState.engineOscillator.frequency.linearRampToValueAtTime(targetFrequency, now + 0.08);
@@ -748,7 +764,8 @@ function applyVehicleSelection(vehicleName) {
   }
 
   if (audioState.engineStarted) {
-    audioState.engineOscillator.type = state.selectedVehicle.startsWith("bike-") ? "sawtooth" : "square";
+    audioState.engineOscillator.type = engineSoundProfile(state.selectedVehicle).wave;
+    updateEngineSound();
   }
 }
 
