@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Racing Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="hud">
+      <div class="stat-card">
+        <p class="label">Score</p>
+        <h1 id="score">0</h1>
+      </div>
+      <div class="stat-card">
+        <p class="label">Speed</p>
+        <h1 id="speedDisplay">96 km/h</h1>
+      </div>
+      <button id="startButton" class="start-button">Start Game</button>
+    </section>
+
+    <section class="game-shell">
+      <div id="gameArea" class="game-area">
+        <div class="road-line line-1"></div>
+        <div class="road-line line-2"></div>
+        <div class="road-line line-3"></div>
+        <div class="road-line line-4"></div>
+
+        <div id="playerCar" class="vehicle player-vehicle car-sport"></div>
+
+        <div id="message" class="message">
+          <h2>Choose Your Vehicle</h2>
+          <p>Pick one bike or car, then start the race.</p>
+
+          <div id="vehiclePicker" class="vehicle-picker">
+            <section class="vehicle-group">
+              <h3>Bikes</h3>
+              <div class="vehicle-grid">
+                <button class="vehicle-option selected" data-vehicle="bike-street">
+                  <span class="vehicle-preview bike-preview bike-street"></span>
+                  <span>Street Bike</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="bike-speed">
+                  <span class="vehicle-preview bike-preview bike-speed"></span>
+                  <span>Speed Bike</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="bike-dirt">
+                  <span class="vehicle-preview bike-preview bike-dirt"></span>
+                  <span>Dirt Bike</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="bike-electric">
+                  <span class="vehicle-preview bike-preview bike-electric"></span>
+                  <span>Electric Bike</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="vehicle-group">
+              <h3>Cars</h3>
+              <div class="vehicle-grid">
+                <button class="vehicle-option" data-vehicle="car-sport">
+                  <span class="vehicle-preview car-preview car-sport"></span>
+                  <span>Sport Car</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="car-muscle">
+                  <span class="vehicle-preview car-preview car-muscle"></span>
+                  <span>Muscle Car</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="car-electric">
+                  <span class="vehicle-preview car-preview car-electric"></span>
+                  <span>Electric Car</span>
+                </button>
+                <button class="vehicle-option" data-vehicle="car-truck">
+                  <span class="vehicle-preview car-preview car-truck"></span>
+                  <span>Truck</span>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <p>Use Left and Right to dodge, Down to remove one boost level.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
