@@ -42,6 +42,7 @@ const targetFramesPerSecond = 60;
 const boosterSpawnTop = -140;
 const boosterCollectionZoneTop = 340;
 const boosterSafetyDistance = 170;
+const boosterWidth = 38;
 
 const state = {
   active: false,
@@ -546,64 +547,107 @@ function refreshSpeed() {
   speedDisplay.textContent = `${kmph} km/h`;
 }
 
-function lanePositions(width = gameBounds.carWidth) {
-  const roadPadding = Math.min(gameBounds.roadPadding, Math.max(14, gameBounds.width * 0.06));
-  const usableWidth = gameBounds.width - roadPadding * 2 - width;
+function roadPadding() {
+  return 0;
+}
+
+function laneCenters() {
+  const padding = roadPadding();
+  const usableWidth = gameBounds.width - padding * 2;
   const gap = usableWidth / (laneCount - 1);
   return Array.from({ length: laneCount }, (_, index) =>
-    Math.round(roadPadding + gap * index)
+    Math.round(padding + gap * index)
   );
+}
+
+function laneLeftFromCenter(center, width) {
+  return Math.round(center - width / 2);
+}
+
+function clampVehicleLeft(left, width) {
+  const padding = roadPadding();
+  const minLeft = padding;
+  const maxLeft = gameBounds.width - padding - width;
+  return Math.round(Math.max(minLeft, Math.min(maxLeft, left)));
+}
+
+function playerCenterX() {
+  return state.playerX + vehicleWidth() / 2;
 }
 
 function middleLaneX() {
-  const lanes = lanePositions(vehicleWidth());
-  return lanes[Math.floor(lanes.length / 2) - 1];
+  return clampVehicleLeft(gameBounds.width / 2 - vehicleWidth() / 2, vehicleWidth());
 }
 
-function playerLaneX() {
-  const lanes = lanePositions();
-  return lanes.reduce((closest, lane) =>
-    Math.abs(lane - state.playerX) < Math.abs(closest - state.playerX) ? lane : closest
+function positionsOverlap(leftA, widthA, leftB, widthB, gap = 18) {
+  return !(leftA + widthA + gap < leftB || leftB + widthB + gap < leftA);
+}
+
+function chooseEnemyX(excludedXs = [], preferPlayerX = false) {
+  const width = gameBounds.carWidth;
+  const playerTargetX = clampVehicleLeft(playerCenterX() - width / 2, width);
+
+  if (preferPlayerX) {
+    const aimedX = clampVehicleLeft(playerTargetX + (Math.random() * 18 - 9), width);
+    if (excludedXs.every((left) => !positionsOverlap(aimedX, width, left, width, 20))) {
+      return aimedX;
+    }
+  }
+
+  const attempts = 24;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const biasToPlayer = Math.random() < 0.35;
+    const candidate = biasToPlayer
+      ? clampVehicleLeft(playerTargetX + (Math.random() * 70 - 35), width)
+      : clampVehicleLeft(
+          roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - width),
+          width
+        );
+
+    if (excludedXs.every((left) => !positionsOverlap(candidate, width, left, width, 20))) {
+      return candidate;
+    }
+  }
+
+  return clampVehicleLeft(
+    roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - width),
+    width
   );
 }
 
-function randomLane(excludedLanes = []) {
-  const lanes = lanePositions().filter((lane) => !excludedLanes.includes(lane));
-  const choices = lanes.length > 0 ? lanes : lanePositions();
-  return choices[Math.floor(Math.random() * choices.length)];
-}
-
-function chooseEnemyLane(excludedLanes = [], preferPlayerLane = false) {
-  const lanes = lanePositions();
-  const availableLanes = lanes.filter((lane) => !excludedLanes.includes(lane));
-  const choices = availableLanes.length > 0 ? availableLanes : lanes;
-  const targetLane = playerLaneX();
-
-  if (preferPlayerLane && choices.includes(targetLane)) {
-    return targetLane;
-  }
-
-  if (choices.includes(targetLane) && Math.random() < 0.45) {
-    return targetLane;
-  }
-
-  return choices[Math.floor(Math.random() * choices.length)];
-}
-
-function laneIsSafeForBooster(lane) {
+function boosterIsSafeAt(left) {
   return state.enemies.every((enemy) => {
-    const enemyLane = parseFloat(enemy.style.left);
+    const enemyLeft = parseFloat(enemy.style.left);
     const enemyTop = parseFloat(enemy.style.top);
     const predictedGap = Math.abs(enemyTop - boosterCollectionZoneTop);
-    return enemyLane !== lane || predictedGap > boosterSafetyDistance;
+    return (
+      !positionsOverlap(left, boosterWidth, enemyLeft, gameBounds.carWidth, 10) ||
+      predictedGap > boosterSafetyDistance
+    );
   });
 }
 
-function safeBoosterLane() {
-  const lanes = lanePositions();
-  const safeLanes = lanes.filter((lane) => laneIsSafeForBooster(lane));
-  const choices = safeLanes.length > 0 ? safeLanes : lanes;
-  return choices[Math.floor(Math.random() * choices.length)];
+function safeBoosterX() {
+  const attempts = 24;
+  const playerTargetX = clampVehicleLeft(playerCenterX() - boosterWidth / 2, boosterWidth);
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const candidate = attempt < 8
+      ? clampVehicleLeft(playerTargetX + (Math.random() * 90 - 45), boosterWidth)
+      : clampVehicleLeft(
+          roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - boosterWidth),
+          boosterWidth
+        );
+
+    if (boosterIsSafeAt(candidate)) {
+      return candidate;
+    }
+  }
+
+  return clampVehicleLeft(
+    roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - boosterWidth),
+    boosterWidth
+  );
 }
 
 function applyVehicleSelection(vehicleName) {
@@ -636,9 +680,9 @@ function createEnemy(y, left) {
 
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
-  const firstLane = chooseEnemyLane([], true);
-  const secondLane = chooseEnemyLane([firstLane], false);
-  const thirdLane = chooseEnemyLane([firstLane, secondLane], false);
+  const firstLane = chooseEnemyX([], true);
+  const secondLane = chooseEnemyX([firstLane], false);
+  const thirdLane = chooseEnemyX([firstLane, secondLane], false);
   state.enemies = [
     createEnemy(-160, firstLane),
     createEnemy(-360, secondLane),
@@ -649,8 +693,9 @@ function resetEnemies() {
 function createBooster(y) {
   const booster = document.createElement("div");
   booster.className = "booster";
+  const left = safeBoosterX();
   booster.style.top = `${y}px`;
-  booster.style.left = `${safeBoosterLane()}px`;
+  booster.style.left = `${left}px`;
   gameArea.appendChild(booster);
   return booster;
 }
@@ -675,14 +720,14 @@ function updateBoosterLaneSafety() {
     return;
   }
 
-  const currentLane = parseFloat(state.booster.style.left);
+  const currentLeft = parseFloat(state.booster.style.left);
   const currentTop = parseFloat(state.booster.style.top);
   const nearCollectionZone = currentTop > 80 && currentTop < boosterCollectionZoneTop + 60;
 
-  if (nearCollectionZone && !laneIsSafeForBooster(currentLane)) {
-    const fallbackLane = safeBoosterLane();
-    if (fallbackLane !== currentLane) {
-      state.booster.style.left = `${fallbackLane}px`;
+  if (nearCollectionZone && !boosterIsSafeAt(currentLeft)) {
+    const fallbackLeft = safeBoosterX();
+    if (Math.abs(fallbackLeft - currentLeft) > 8) {
+      state.booster.style.left = `${fallbackLeft}px`;
     }
   }
 }
@@ -723,8 +768,7 @@ function updatePlayer() {
     state.playerX += 9;
   }
 
-  const maxX = gameBounds.width - vehicleWidth();
-  state.playerX = Math.max(0, Math.min(maxX, state.playerX));
+  state.playerX = clampVehicleLeft(state.playerX, vehicleWidth());
   playerCar.style.left = `${state.playerX}px`;
 }
 
@@ -768,7 +812,8 @@ function updateEnemies() {
         .filter((item) => item !== enemy)
         .map((item) => parseFloat(item.style.left));
       const forcePlayerLane = state.enemyRespawns % 2 === 0;
-      enemy.style.left = `${chooseEnemyLane(occupiedLanes, forcePlayerLane)}px`;
+      const nextLane = chooseEnemyX(occupiedLanes, forcePlayerLane);
+      enemy.style.left = `${nextLane}px`;
     }
 
     enemy.style.top = `${nextTop}px`;
@@ -977,8 +1022,7 @@ window.addEventListener("resize", () => {
     state.playerX = middleLaneX();
     playerCar.style.left = `${state.playerX}px`;
   } else {
-    const maxX = gameBounds.width - vehicleWidth();
-    state.playerX = Math.max(0, Math.min(maxX, state.playerX));
+    state.playerX = clampVehicleLeft(state.playerX, vehicleWidth());
     playerCar.style.left = `${state.playerX}px`;
   }
   refreshSpeed();
