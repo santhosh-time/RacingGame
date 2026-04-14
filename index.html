@@ -14,6 +14,10 @@
         <h1 id="score">0</h1>
       </div>
       <div class="stat-card">
+        <p class="label">Best</p>
+        <h1 id="bestScore">Demo</h1>
+      </div>
+      <div class="stat-card">
         <p class="label">Speed</p>
         <h1 id="speedDisplay">96 km/h</h1>
       </div>
@@ -33,56 +37,74 @@
         <div id="playerCar" class="vehicle player-vehicle car-sport"></div>
 
         <div id="message" class="message">
-          <h2>Choose Your Vehicle</h2>
-          <p>Pick one bike or car, then start the race.</p>
+          <div id="racerGate" class="auth-gate">
+            <h2>Name Your Racer</h2>
+            <p>Enter a racer name, choose your vehicle, and we will track your highest score for this play session.</p>
 
-          <div id="vehiclePicker" class="vehicle-picker">
-            <section class="vehicle-group">
-              <h3>Bikes</h3>
-              <div class="vehicle-grid">
-                <button class="vehicle-option selected" data-vehicle="bike-street">
-                  <span class="vehicle-preview bike-preview bike-street"></span>
-                  <span>Street Bike</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="bike-speed">
-                  <span class="vehicle-preview bike-preview bike-speed"></span>
-                  <span>Speed Bike</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="bike-dirt">
-                  <span class="vehicle-preview bike-preview bike-dirt"></span>
-                  <span>Dirt Bike</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="bike-electric">
-                  <span class="vehicle-preview bike-preview bike-electric"></span>
-                  <span>Electric Bike</span>
-                </button>
+            <form id="racerForm" class="sign-in-form">
+              <label class="field">
+                <span>Racer Name</span>
+                <input id="racerNameInput" type="text" maxlength="18" placeholder="Thunder Rider" autocomplete="nickname">
+              </label>
+              <div class="auth-actions">
+                <button id="continueButton" class="auth-button primary" type="submit">Continue</button>
               </div>
-            </section>
-
-            <section class="vehicle-group">
-              <h3>Cars</h3>
-              <div class="vehicle-grid">
-                <button class="vehicle-option" data-vehicle="car-sport">
-                  <span class="vehicle-preview car-preview car-sport"></span>
-                  <span>Sport Car</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="car-muscle">
-                  <span class="vehicle-preview car-preview car-muscle"></span>
-                  <span>Muscle Car</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="car-electric">
-                  <span class="vehicle-preview car-preview car-electric"></span>
-                  <span>Electric Car</span>
-                </button>
-                <button class="vehicle-option" data-vehicle="car-truck">
-                  <span class="vehicle-preview car-preview car-truck"></span>
-                  <span>Truck</span>
-                </button>
-              </div>
-            </section>
+              <p id="setupStatus" class="auth-status">If left blank, we will use Guest Racer.</p>
+            </form>
           </div>
 
-          <p>Use Left and Right to dodge, Down to remove one boost level.</p>
+          <div id="vehicleSetup" class="vehicle-setup hidden">
+            <h2>Choose Your Vehicle</h2>
+            <p id="sessionModeText">Racer ready. Best score is tracked for this session.</p>
+
+            <div id="vehiclePicker" class="vehicle-picker">
+              <section class="vehicle-group">
+                <h3>Bikes</h3>
+                <div class="vehicle-grid">
+                  <button class="vehicle-option selected" data-vehicle="bike-street">
+                    <span class="vehicle-preview bike-preview bike-street"></span>
+                    <span>Street Bike</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="bike-speed">
+                    <span class="vehicle-preview bike-preview bike-speed"></span>
+                    <span>Speed Bike</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="bike-dirt">
+                    <span class="vehicle-preview bike-preview bike-dirt"></span>
+                    <span>Dirt Bike</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="bike-electric">
+                    <span class="vehicle-preview bike-preview bike-electric"></span>
+                    <span>Electric Bike</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="vehicle-group">
+                <h3>Cars</h3>
+                <div class="vehicle-grid">
+                  <button class="vehicle-option" data-vehicle="car-sport">
+                    <span class="vehicle-preview car-preview car-sport"></span>
+                    <span>Sport Car</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="car-muscle">
+                    <span class="vehicle-preview car-preview car-muscle"></span>
+                    <span>Muscle Car</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="car-electric">
+                    <span class="vehicle-preview car-preview car-electric"></span>
+                    <span>Electric Car</span>
+                  </button>
+                  <button class="vehicle-option" data-vehicle="car-truck">
+                    <span class="vehicle-preview car-preview car-truck"></span>
+                    <span>Truck</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <p>Use Left and Right to dodge, Down to remove one boost level.</p>
+          </div>
         </div>
       </div>
 

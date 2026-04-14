@@ -1,10 +1,17 @@
 const gameArea = document.getElementById("gameArea");
 const playerCar = document.getElementById("playerCar");
 const scoreDisplay = document.getElementById("score");
+const bestScoreDisplay = document.getElementById("bestScore");
 const speedDisplay = document.getElementById("speedDisplay");
 const soundButton = document.getElementById("soundButton");
 const startButton = document.getElementById("startButton");
 const message = document.getElementById("message");
+const racerGate = document.getElementById("racerGate");
+const vehicleSetup = document.getElementById("vehicleSetup");
+const racerForm = document.getElementById("racerForm");
+const racerNameInput = document.getElementById("racerNameInput");
+const setupStatus = document.getElementById("setupStatus");
+const sessionModeText = document.getElementById("sessionModeText");
 const vehicleOptions = Array.from(document.querySelectorAll(".vehicle-option"));
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
@@ -55,6 +62,8 @@ const state = {
   animationId: 0,
   soundEnabled: true,
   enemyRespawns: 0,
+  racerName: "Guest Racer",
+  bestScore: 0,
 };
 
 const audioState = {
@@ -69,6 +78,316 @@ const audioState = {
 function syncGameBounds() {
   gameBounds.width = gameArea.clientWidth;
   gameBounds.height = gameArea.clientHeight;
+}
+
+function updateBestScoreDisplay() {
+  bestScoreDisplay.textContent = String(state.bestScore);
+}
+
+function updateSessionModeText() {
+  sessionModeText.textContent = `${state.racerName} is ready. Highest score is tracked for this session.`;
+}
+
+function showVehicleSetup() {
+  racerGate.classList.add("hidden");
+  vehicleSetup.classList.remove("hidden");
+  updateSessionModeText();
+  updateBestScoreDisplay();
+}
+
+function showAuthGate() {
+  racerGate.classList.remove("hidden");
+  vehicleSetup.classList.add("hidden");
+}
+
+function setSetupStatus(messageText) {
+  setupStatus.textContent = messageText;
+}
+
+function setRacerName(name) {
+  state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
+  showVehicleSetup();
+}
+
+function maybeUpdateBestScore() {
+  if (state.score > state.bestScore) {
+    state.bestScore = state.score;
+    updateBestScoreDisplay();
+  }
+}
+
+function drawFittedCenteredText(ctx, text, x, y, maxWidth, startSize, minSize, color) {
+  let fontSize = startSize;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  while (fontSize >= minSize) {
+    ctx.font = `bold ${fontSize}px Verdana`;
+    if (ctx.measureText(text).width <= maxWidth) {
+      break;
+    }
+    fontSize -= 6;
+  }
+
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+function prettifyVehicleName() {
+  const names = {
+    "bike-street": "Street Bike",
+    "bike-speed": "Speed Bike",
+    "bike-dirt": "Dirt Bike",
+    "bike-electric": "Electric Bike",
+    "car-sport": "Sports Car",
+    "car-muscle": "Muscle Car",
+    "car-electric": "Electric Car",
+    "car-truck": "Truck",
+  };
+
+  return names[state.selectedVehicle] || "Racing Vehicle";
+}
+
+function vehicleAccentColor() {
+  const colors = {
+    "bike-street": "#4fc3f7",
+    "bike-speed": "#ff6b81",
+    "bike-dirt": "#ffb74d",
+    "bike-electric": "#80deea",
+    "car-sport": "#ff8a80",
+    "car-muscle": "#f6c36b",
+    "car-electric": "#81d4fa",
+    "car-truck": "#90a4ae",
+  };
+
+  return colors[state.selectedVehicle] || "#73efff";
+}
+
+function drawVehicleBadge(ctx) {
+  const accent = vehicleAccentColor();
+  const isBike = state.selectedVehicle.startsWith("bike-");
+  const isTruck = state.selectedVehicle === "car-truck";
+  const isElectric = state.selectedVehicle.includes("electric");
+  const isMuscle = state.selectedVehicle === "car-muscle";
+  const isSport = state.selectedVehicle === "car-sport";
+  const isDirt = state.selectedVehicle === "bike-dirt";
+
+  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
+  ctx.fillRect(210, 1100, 660, 450);
+  ctx.strokeStyle = "rgba(115, 239, 255, 0.35)";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(210, 1100, 660, 450);
+
+  ctx.save();
+  ctx.translate(540, 1295);
+
+  if (isBike) {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.roundRect(-38, -118, 76, 236, 28);
+    ctx.fill();
+
+    ctx.fillStyle = "#e7f7ff";
+    ctx.beginPath();
+    ctx.roundRect(-24, -76, 48, 74, 16);
+    ctx.fill();
+
+    ctx.strokeStyle = "#17212b";
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.arc(0, -138, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 138, 34, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#0f1722";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(-56, -42);
+    ctx.lineTo(56, -42);
+    ctx.stroke();
+
+    if (isElectric) {
+      ctx.fillStyle = "#d9fbff";
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(18, 24);
+      ctx.lineTo(4, 24);
+      ctx.lineTo(20, 64);
+      ctx.lineTo(-12, 14);
+      ctx.lineTo(2, 14);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (isDirt) {
+      ctx.fillStyle = "#3a2610";
+      ctx.fillRect(-28, 48, 56, 30);
+    }
+  } else {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.roundRect(-104, -150, 208, 300, 40);
+    ctx.fill();
+
+    ctx.fillStyle = "#e7f7ff";
+    ctx.beginPath();
+    ctx.roundRect(-62, -102, 124, 72, 22);
+    ctx.fill();
+
+    ctx.fillStyle = "#12202d";
+    ctx.beginPath();
+    ctx.roundRect(-56, -8, 112, 102, 24);
+    ctx.fill();
+
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.roundRect(-124, -92, 20, 72, 10);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(104, -92, 20, 72, 10);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(-124, 38, 20, 72, 10);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(104, 38, 20, 72, 10);
+    ctx.fill();
+
+    if (isSport) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(-70, -12, 140, 12);
+    }
+
+    if (isMuscle) {
+      ctx.fillStyle = "#24190f";
+      ctx.fillRect(-44, -50, 88, 76);
+    }
+
+    if (isElectric) {
+      ctx.fillStyle = "#d9fbff";
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(16, 18);
+      ctx.lineTo(4, 18);
+      ctx.lineTo(18, 52);
+      ctx.lineTo(-10, 8);
+      ctx.lineTo(2, 8);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (isTruck) {
+      ctx.fillStyle = "#d7e3ec";
+      ctx.beginPath();
+      ctx.roundRect(-64, -118, 128, 84, 18);
+      ctx.fill();
+      ctx.fillStyle = "#0f1722";
+      ctx.fillRect(-88, 42, 176, 18);
+    }
+  }
+
+  ctx.restore();
+}
+
+function createScoreCardImage() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const ctx = canvas.getContext("2d");
+  const scoreCardHighScore = Math.max(state.bestScore, state.score);
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#0f2746");
+  gradient.addColorStop(1, "#050b14");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "rgba(255, 209, 102, 0.08)";
+  ctx.beginPath();
+  ctx.arc(860, 260, 260, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(7, 17, 28, 0.92)";
+  ctx.fillRect(120, 95, 840, 190);
+  ctx.strokeStyle = "rgba(115, 239, 255, 0.45)";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(120, 95, 840, 190);
+
+  ctx.fillStyle = "#232323";
+  ctx.fillRect(250, 270, 580, 1410);
+  ctx.fillStyle = "#d7d7d7";
+  ctx.fillRect(235, 270, 15, 1410);
+  ctx.fillRect(830, 270, 15, 1410);
+  ctx.fillStyle = "#ffe66d";
+  for (let y = 310; y < 1620; y += 180) {
+    ctx.fillRect(535, y, 10, 90);
+  }
+
+  ctx.fillStyle = "#f7fff7";
+  ctx.font = "bold 78px Verdana";
+  ctx.textAlign = "center";
+  ctx.fillText("Viral Racing Game", 540, 178);
+  ctx.fillStyle = "#cfd8dc";
+  ctx.font = "34px Verdana";
+  ctx.fillText("High Score Card", 540, 236);
+
+  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
+  ctx.fillRect(160, 390, 760, 190);
+  drawFittedCenteredText(ctx, state.racerName, 540, 485, 680, 108, 54, "#73efff");
+
+  ctx.fillStyle = "rgba(8, 18, 28, 0.76)";
+  ctx.fillRect(210, 640, 660, 360);
+  ctx.strokeStyle = "rgba(255, 209, 102, 0.42)";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(210, 640, 660, 360);
+
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "bold 60px Verdana";
+  ctx.fillText("Highest Score", 540, 735);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 210px Verdana";
+  ctx.fillText(String(scoreCardHighScore), 540, 875);
+
+  drawVehicleBadge(ctx);
+
+  ctx.fillStyle = "#73efff";
+  ctx.font = "bold 44px Verdana";
+  ctx.fillText("Selected Vehicle", 540, 1470);
+  drawFittedCenteredText(ctx, prettifyVehicleName(), 540, 1530, 520, 58, 34, "#f7fff7");
+
+  ctx.strokeStyle = "rgba(115, 239, 255, 0.7)";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(90, 90, 900, 1740);
+
+  return canvas;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+}
+
+async function saveScoreCard() {
+  const filename = `${state.racerName.replace(/\s+/g, "-").toLowerCase()}-high-score.png`;
+  const canvas = createScoreCardImage();
+  const blob = await canvasToBlob(canvas);
+  if (!blob) {
+    return;
+  }
+  const objectUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 function updateSoundButton() {
@@ -537,13 +856,24 @@ function endGame() {
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   playCrashSound();
+  maybeUpdateBestScore();
   message.innerHTML = `
     <h2>Crash!</h2>
-    <p>Your score: ${state.score}</p>
-    <p>Keep your selected vehicle and press Restart Game to try again.</p>
+    <p>${state.racerName}, your run scored ${state.score}.</p>
+    <p>Highest score this session: ${state.bestScore}</p>
+    <div class="auth-actions">
+      <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
+      <button id="closeCrashButton" class="auth-button secondary" type="button">Close</button>
+    </div>
+    <p>Press Restart Game to try again.</p>
   `;
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
+  document.getElementById("downloadScoreCardButton").addEventListener("click", saveScoreCard);
+  document.getElementById("closeCrashButton").addEventListener("click", () => {
+    message.classList.add("hidden");
+    syncVehiclePreviewVisibility();
+  });
 }
 
 vehicleOptions.forEach((option) => {
@@ -559,8 +889,16 @@ syncGameBounds();
 refreshSpeed();
 syncVehiclePreviewVisibility();
 updateSoundButton();
+updateBestScoreDisplay();
+showAuthGate();
 
 startButton.addEventListener("click", startGame);
+
+racerForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  setRacerName(racerNameInput.value);
+  setSetupStatus(`Racer name locked: ${state.racerName}`);
+});
 
 soundButton.addEventListener("click", async () => {
   await primeMobileAudio();

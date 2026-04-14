@@ -49,6 +49,13 @@ body {
   min-width: 120px;
 }
 
+.stat-card h1 {
+  margin: 6px 0 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .label {
   margin: 0;
   color: var(--muted);
@@ -58,12 +65,16 @@ body {
 }
 
 #score {
-  margin: 4px 0 0;
   font-size: 2rem;
 }
 
+#bestScore {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
 #speedDisplay {
-  margin: 4px 0 0;
   font-size: 1.65rem;
 }
 
@@ -139,7 +150,7 @@ body {
 }
 
 .player-vehicle {
-  bottom: 18px;
+  bottom: 38px;
   left: 148px;
   z-index: 2;
   filter:
@@ -254,6 +265,78 @@ body {
   margin: 0;
   max-width: 34ch;
   color: var(--muted);
+}
+
+.auth-gate,
+.vehicle-setup {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.auth-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.auth-actions.compact {
+  margin-top: 4px;
+}
+
+.auth-button {
+  min-height: 48px;
+  border-radius: 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-button.primary {
+  border: 0;
+  color: #17212b;
+  background: linear-gradient(135deg, var(--accent), #ffb703);
+}
+
+.auth-button.secondary {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sign-in-form {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 0 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-status {
+  min-height: 1.4em;
+  font-size: 0.92rem;
 }
 
 .vehicle-picker {
@@ -409,6 +492,10 @@ body {
   }
 
   .vehicle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-actions {
     grid-template-columns: 1fr;
   }
 
