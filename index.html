@@ -38,25 +38,45 @@
 
         <div id="message" class="message">
           <div id="racerGate" class="auth-gate">
-            <h2>Name Your Racer</h2>
-            <p>Enter a racer name, choose your vehicle, and we will track your highest score for this play session.</p>
+            <h2>Start Your Garage</h2>
+            <p>Sign in to keep your racer profile and best score updated in The Viral Alien game, or jump in as a guest for local play.</p>
 
-            <form id="racerForm" class="sign-in-form">
+            <form id="authForm" class="sign-in-form">
+              <label class="field">
+                <span>Email</span>
+                <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email">
+              </label>
+              <label class="field">
+                <span>Password</span>
+                <input id="authPasswordInput" type="password" minlength="6" placeholder="At least 6 characters" autocomplete="current-password">
+              </label>
               <label class="field">
                 <span>Racer Name</span>
-                <input id="racerNameInput" type="text" maxlength="18" placeholder="Thunder Rider" autocomplete="nickname">
+                <input id="authRacerNameInput" type="text" maxlength="18" placeholder="Thunder Rider" autocomplete="nickname">
               </label>
               <div class="auth-actions">
-                <button id="continueButton" class="auth-button primary" type="submit">Continue</button>
+                <button id="signInButton" class="auth-button secondary" type="button">Sign In</button>
+                <button id="signUpButton" class="auth-button primary" type="button">Sign Up</button>
               </div>
-              <p id="setupStatus" class="auth-status">If left blank, we will use Guest Racer.</p>
+              <button id="guestButton" class="auth-button tertiary" type="button">Play As Guest</button>
+              <p id="authStatus" class="auth-status">Sign in to save your progress. Guest mode keeps scores only on this device.</p>
             </form>
           </div>
 
           <div id="vehicleSetup" class="vehicle-setup hidden">
             <h2>Choose Your Vehicle</h2>
             <p id="sessionModeText">Racer ready. Best score is tracked for this session.</p>
-            <p id="cloudStatus" class="cloud-status">Supabase: Connecting...</p>
+            <p id="cloudStatus" class="cloud-status">Checking your game progress...</p>
+            <div class="profile-panel">
+              <label class="field profile-field">
+                <span>Profile Racer Name</span>
+                <input id="profileNameInput" type="text" maxlength="18" placeholder="Thunder Rider" autocomplete="nickname">
+              </label>
+              <div class="auth-actions compact">
+                <button id="saveProfileButton" class="auth-button primary" type="button">Save Name</button>
+                <button id="signOutButton" class="auth-button secondary" type="button">Sign Out</button>
+              </div>
+            </div>
 
             <div id="vehiclePicker" class="vehicle-picker">
               <section class="vehicle-group">

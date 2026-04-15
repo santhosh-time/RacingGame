@@ -72,10 +72,12 @@ const state = {
   animationId: 0,
   soundEnabled: true,
   supabaseReady: false,
+  user: null,
   cloudSyncActive: false,
   enemyRespawns: 0,
   racerName: "Guest Racer",
   bestScore: 0,
+  bestScoreVehicle: "bike-street",
 };
 
 const audioState = {
@@ -100,11 +102,19 @@ function overlayRefs() {
   return {
     racerGate: document.getElementById("racerGate"),
     vehicleSetup: document.getElementById("vehicleSetup"),
-    racerForm: document.getElementById("racerForm"),
-    racerNameInput: document.getElementById("racerNameInput"),
-    setupStatus: document.getElementById("setupStatus"),
+    authForm: document.getElementById("authForm"),
+    authEmailInput: document.getElementById("authEmailInput"),
+    authPasswordInput: document.getElementById("authPasswordInput"),
+    authRacerNameInput: document.getElementById("authRacerNameInput"),
+    authStatus: document.getElementById("authStatus"),
     sessionModeText: document.getElementById("sessionModeText"),
     cloudStatus: document.getElementById("cloudStatus"),
+    profileNameInput: document.getElementById("profileNameInput"),
+    saveProfileButton: document.getElementById("saveProfileButton"),
+    signOutButton: document.getElementById("signOutButton"),
+    signInButton: document.getElementById("signInButton"),
+    signUpButton: document.getElementById("signUpButton"),
+    guestButton: document.getElementById("guestButton"),
     vehicleOptions: Array.from(document.querySelectorAll(".vehicle-option")),
   };
 }
@@ -120,12 +130,32 @@ function updateCloudStatus(messageText, isReady = false) {
   cloudStatus.classList.toggle("is-error", !isReady);
 }
 
-function normalizedRacerName() {
-  return state.racerName.trim().toLowerCase();
-}
-
 function isGuestRacerName(name = state.racerName) {
   return !name || name.trim().toLowerCase() === "guest racer";
+}
+
+function defaultRacerNameForUser(user = state.user) {
+  const metadataName = user?.user_metadata?.racer_name;
+  if (metadataName && String(metadataName).trim()) {
+    return String(metadataName).trim();
+  }
+
+  const emailName = user?.email?.split("@")[0];
+  if (emailName && emailName.trim()) {
+    return emailName.trim().slice(0, 18);
+  }
+
+  return "Road Rider";
+}
+
+function updateAuthStatus(messageText, isReady = false) {
+  const { authStatus } = overlayRefs();
+  if (!authStatus) {
+    return;
+  }
+
+  authStatus.textContent = messageText;
+  authStatus.classList.toggle("is-connected", isReady);
 }
 
 function withTimeout(promise, timeoutMs = 6000) {
@@ -142,67 +172,91 @@ function formatSupabaseError(error, fallbackMessage) {
     return fallbackMessage;
   }
 
+  const message = String(error.message || "").toLowerCase();
+  const code = String(error.code || "").toLowerCase();
+
+  if (message.includes("invalid login credentials") || code === "invalid_credentials") {
+    return "That email or password does not match. Try again and we'll get you back on the road.";
+  }
+
+  if (message.includes("email not confirmed")) {
+    return "Check your email and confirm your account before signing in.";
+  }
+
+  if (message.includes("user already registered")) {
+    return "That email is already in the garage. Try signing in instead.";
+  }
+
+  if (message.includes("password should be at least")) {
+    return "Pick a stronger password with at least 6 characters.";
+  }
+
+  if (message.includes("invalid email")) {
+    return "That email address does not look right. Please check it and try again.";
+  }
+
   const parts = [error.message, error.details, error.hint, error.code]
     .filter(Boolean)
     .map((part) => String(part).trim())
     .filter(Boolean);
 
-  return parts.length > 0 ? `Supabase: ${parts.join(" | ")}` : fallbackMessage;
+  return parts.length > 0 ? `We hit a cloud save issue: ${parts.join(" | ")}` : fallbackMessage;
 }
 
 async function initializeSupabase() {
   if (!supabaseClient) {
-    updateCloudStatus("Supabase: Client library did not load.", false);
+    updateCloudStatus("Cloud save is not available right now.", false);
     return;
   }
 
-  updateCloudStatus("Supabase: Connecting...", false);
+  updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
 
   try {
-    const { error } = await withTimeout(
-      supabaseClient
-        .from("racer_profiles")
-        .select("racer_name", { head: true, count: "exact" })
-        .limit(1)
-    );
+    const { data, error } = await withTimeout(supabaseClient.auth.getSession());
 
     if (error) {
       throw error;
     }
 
     state.supabaseReady = true;
-    state.cloudSyncActive = true;
-    updateCloudStatus("Supabase: Connected and ready for backend features.", true);
+    updateCloudStatus("Your cloud garage is ready.", true);
 
-    if (state.racerName) {
-      loadCloudBestScore();
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      handleSessionChange(session);
+    });
+
+    if (data?.session) {
+      await handleSessionChange(data.session);
+    } else {
+      state.user = null;
+      state.cloudSyncActive = false;
+      updateAuthStatus("Sign in to keep your racer profile and best score updated, or play as a guest.", true);
+      showAuthGate();
+      showGuestProfileEditor();
     }
   } catch (error) {
     state.supabaseReady = false;
     state.cloudSyncActive = false;
     updateCloudStatus(
-      formatSupabaseError(error, "Supabase: Connection failed. Check project URL, key, and table policies."),
+      formatSupabaseError(error, "We could not connect to cloud save yet."),
       false
     );
     console.error("Supabase initialization error:", error);
   }
 }
 
-async function loadCloudBestScore() {
-  if (!state.supabaseReady || !supabaseClient || isGuestRacerName()) {
-    state.bestScore = 0;
-    updateBestScoreDisplay();
-    updateCloudStatus("Supabase: Guest Racer stays local only. Use a custom name to save online.", true);
+async function loadProfile() {
+  if (!state.supabaseReady || !supabaseClient || !state.user) {
     return;
   }
 
-  updateCloudStatus(`Supabase: Loading ${state.racerName}'s best score...`, false);
+  updateCloudStatus(`Checking ${state.racerName}'s garage...`, false);
 
   try {
     const { data, error } = await supabaseClient
-      .from("racer_profiles")
-      .select("best_score, favorite_vehicle")
-      .eq("racer_name", normalizedRacerName())
+      .from("profiles")
+      .select("racer_name, best_score, favorite_vehicle, best_score_vehicle")
+      .eq("user_id", state.user.id)
       .maybeSingle();
 
     if (error) {
@@ -211,77 +265,149 @@ async function loadCloudBestScore() {
 
     if (!data) {
       const { error: insertError } = await supabaseClient
-        .from("racer_profiles")
+        .from("profiles")
         .insert({
-          racer_name: normalizedRacerName(),
+          user_id: state.user.id,
+          racer_name: defaultRacerNameForUser(),
           best_score: 0,
           favorite_vehicle: state.selectedVehicle,
+          best_score_vehicle: state.selectedVehicle,
         });
 
       if (insertError) {
         throw insertError;
       }
 
+      state.racerName = defaultRacerNameForUser();
       state.bestScore = 0;
+      state.bestScoreVehicle = state.selectedVehicle;
       updateBestScoreDisplay();
-      updateCloudStatus(`Supabase: ${state.racerName} is ready. Cloud best score starts at 0.`, true);
+      updateProfileInputs();
+      updateSessionModeText();
+      updateCloudStatus(`${state.racerName}, your best score is 0 for now. Let's set a new record.`, true);
       return;
     }
 
+    state.racerName = data.racer_name || defaultRacerNameForUser();
     state.bestScore = Number(data.best_score) || 0;
+    state.bestScoreVehicle = vehicleClasses.includes(data.best_score_vehicle)
+      ? data.best_score_vehicle
+      : (vehicleClasses.includes(data.favorite_vehicle) ? data.favorite_vehicle : state.selectedVehicle);
+    if (data.favorite_vehicle && vehicleClasses.includes(data.favorite_vehicle)) {
+      applyVehicleSelection(data.favorite_vehicle);
+    }
     updateBestScoreDisplay();
-    updateCloudStatus(`Supabase: Loaded best score ${state.bestScore} for ${state.racerName}.`, true);
+    updateProfileInputs();
+    updateSessionModeText();
+    updateCloudStatus(`${state.racerName}, your best score is ${state.bestScore}.`, true);
   } catch (error) {
     updateCloudStatus(
-      formatSupabaseError(error, "Supabase: Could not load best score yet. Check table policies."),
+      formatSupabaseError(error, "We could not load your profile yet."),
       false
     );
-    console.error("Supabase load error:", error);
+    updateAuthStatus("We could not open your saved progress yet. You can still play as a guest for now.", false);
+    console.error("Supabase profile load error:", error);
   }
 }
 
 async function saveCloudBestScore() {
-  if (!state.supabaseReady || !supabaseClient || !state.cloudSyncActive) {
+  if (!state.supabaseReady || !supabaseClient || !state.cloudSyncActive || !state.user) {
     return;
   }
 
   try {
     const { error } = await supabaseClient
-      .from("racer_profiles")
+      .from("profiles")
       .upsert({
-        racer_name: normalizedRacerName(),
+        user_id: state.user.id,
+        racer_name: state.racerName,
         best_score: state.bestScore,
+        best_score_vehicle: state.bestScoreVehicle,
         favorite_vehicle: state.selectedVehicle,
-      }, { onConflict: "racer_name" });
+      }, { onConflict: "user_id" });
 
     if (error) {
       throw error;
     }
 
-    updateCloudStatus(`Supabase: Synced best score ${state.bestScore} for ${state.racerName}.`, true);
+    updateCloudStatus(`${state.racerName}, your new best score ${state.bestScore} has been saved.`, true);
   } catch (error) {
     updateCloudStatus(
-      formatSupabaseError(error, "Supabase: Best score save failed. Check table policies."),
+      formatSupabaseError(error, "We could not save your best score right now."),
       false
     );
     console.error("Supabase save error:", error);
   }
 }
 
+async function saveProfileName() {
+  if (!state.user || !supabaseClient) {
+    return;
+  }
+
+  const { profileNameInput } = overlayRefs();
+  const nextName = profileNameInput?.value?.trim();
+
+  if (!nextName) {
+    updateCloudStatus("Enter a racer name before saving your profile.", false);
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("profiles")
+      .upsert({
+        user_id: state.user.id,
+        racer_name: nextName,
+        best_score: state.bestScore,
+        best_score_vehicle: state.bestScoreVehicle,
+        favorite_vehicle: state.selectedVehicle,
+      }, { onConflict: "user_id" });
+
+    if (error) {
+      throw error;
+    }
+
+    state.racerName = nextName;
+    updateSessionModeText();
+    updateCloudStatus(`Your racer name is now ${state.racerName}.`, true);
+  } catch (error) {
+    updateCloudStatus(formatSupabaseError(error, "We could not save your racer name."), false);
+    console.error("Supabase profile name save error:", error);
+  }
+}
+
 function updateSessionModeText() {
   const { sessionModeText } = overlayRefs();
   if (sessionModeText) {
-    sessionModeText.textContent = `${state.racerName} is ready. Highest score is tracked for this session.`;
+    sessionModeText.textContent = state.user
+      ? `${state.racerName} is signed in. Highest score is tracked in The Viral Alien game.`
+      : `${state.racerName} is ready. Highest score is tracked only on this device for now.`;
+  }
+}
+
+function updateProfileInputs() {
+  const { profileNameInput, saveProfileButton, signOutButton } = overlayRefs();
+  if (profileNameInput) {
+    profileNameInput.value = isGuestRacerName() ? "" : state.racerName;
+    profileNameInput.disabled = !state.user;
+  }
+  if (saveProfileButton) {
+    saveProfileButton.disabled = !state.user;
+  }
+  if (signOutButton) {
+    signOutButton.disabled = !state.user;
   }
 }
 
 function showVehicleSetup() {
-  const { racerGate, vehicleSetup, racerNameInput } = overlayRefs();
+  const { racerGate, vehicleSetup, authRacerNameInput } = overlayRefs();
   racerGate.classList.add("hidden");
   vehicleSetup.classList.remove("hidden");
-  if (racerNameInput) {
-    racerNameInput.value = state.racerName === "Guest Racer" ? "" : state.racerName;
+  if (authRacerNameInput) {
+    authRacerNameInput.value = isGuestRacerName() ? "" : state.racerName;
   }
+  updateProfileInputs();
   updateSessionModeText();
   updateBestScoreDisplay();
 }
@@ -292,22 +418,41 @@ function showAuthGate() {
   vehicleSetup.classList.add("hidden");
 }
 
-function setSetupStatus(messageText) {
-  const { setupStatus } = overlayRefs();
-  if (setupStatus) {
-    setupStatus.textContent = messageText;
-  }
+function startGuestMode(name = "") {
+  state.user = null;
+  state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
+  state.bestScore = 0;
+  state.cloudSyncActive = false;
+  updateBestScoreDisplay();
+  updateSessionModeText();
+  updateProfileInputs();
+  updateCloudStatus("Guest mode is ready. Your score will stay on this device only.", true);
+  updateAuthStatus("Guest mode is ready. You can sign in later whenever you want.", true);
+  showVehicleSetup();
 }
 
-function setRacerName(name) {
-  state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
-  state.cloudSyncActive = state.supabaseReady && !isGuestRacerName();
-  showVehicleSetup();
-  if (state.supabaseReady) {
-    loadCloudBestScore();
-  } else {
-    updateCloudStatus("Supabase: Waiting for connection before loading cloud best score.", false);
+function showGuestProfileEditor() {
+  state.racerName = "Guest Racer";
+  state.bestScore = 0;
+  updateBestScoreDisplay();
+  updateProfileInputs();
+  updateSessionModeText();
+}
+
+async function handleSessionChange(session) {
+  state.user = session?.user || null;
+  state.cloudSyncActive = Boolean(state.user);
+
+  if (!state.user) {
+    showGuestProfileEditor();
+    showAuthGate();
+    updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
+    return;
   }
+
+  updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
+  await loadProfile();
+  showVehicleSetup();
 }
 
 function resetSessionForNewGame() {
@@ -333,14 +478,25 @@ function resetSessionForNewGame() {
   message.innerHTML = initialMessageMarkup;
   bindOverlayControls();
   showVehicleSetup();
-  setSetupStatus(`Choose a vehicle for ${state.racerName}. Best score has been reset.`);
+  updateAuthStatus(`Choose a vehicle for ${state.racerName}. Best score has been reset.`, true);
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
   startButton.textContent = "Start Game";
 }
 
 function bindOverlayControls() {
-  const { racerForm, racerNameInput, vehicleOptions } = overlayRefs();
+  const {
+    authForm,
+    authEmailInput,
+    authPasswordInput,
+    authRacerNameInput,
+    vehicleOptions,
+    signInButton,
+    signUpButton,
+    guestButton,
+    saveProfileButton,
+    signOutButton,
+  } = overlayRefs();
 
   vehicleOptions.forEach((option) => {
     option.classList.toggle("selected", option.dataset.vehicle === state.selectedVehicle);
@@ -351,11 +507,90 @@ function bindOverlayControls() {
     });
   });
 
-  if (racerForm) {
-    racerForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      setRacerName(racerNameInput ? racerNameInput.value : "");
-      setSetupStatus(`Racer name locked: ${state.racerName}`);
+  if (authForm) {
+    authForm.addEventListener("submit", (event) => event.preventDefault());
+  }
+
+  if (signInButton) {
+    signInButton.addEventListener("click", async () => {
+      const email = authEmailInput?.value?.trim();
+      const password = authPasswordInput?.value || "";
+
+      if (!email || !password) {
+        updateAuthStatus("Enter your email and password to continue.", false);
+        return;
+      }
+
+      updateAuthStatus("Opening your garage...", false);
+
+      try {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          throw error;
+        }
+      } catch (error) {
+        updateAuthStatus(formatSupabaseError(error, "Could not sign in."), false);
+      }
+    });
+  }
+
+  if (signUpButton) {
+    signUpButton.addEventListener("click", async () => {
+      const email = authEmailInput?.value?.trim();
+      const password = authPasswordInput?.value || "";
+      const racerName = authRacerNameInput?.value?.trim();
+
+      if (!email || !password) {
+        updateAuthStatus("Enter your email and password before creating your racer.", false);
+        return;
+      }
+
+      updateAuthStatus("Building your racer profile...", false);
+
+      try {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              racer_name: racerName || "Road Rider",
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (!data.session) {
+          updateAuthStatus("Your racer is almost ready. Check your email, confirm it, then sign in.", true);
+        } else {
+          updateAuthStatus("Your racer profile is ready and you are signed in.", true);
+        }
+      } catch (error) {
+        updateAuthStatus(formatSupabaseError(error, "Could not sign up."), false);
+      }
+    });
+  }
+
+  if (guestButton) {
+    guestButton.addEventListener("click", () => {
+      startGuestMode(authRacerNameInput?.value || "");
+    });
+  }
+
+  if (saveProfileButton) {
+    saveProfileButton.addEventListener("click", saveProfileName);
+  }
+
+  if (signOutButton) {
+    signOutButton.addEventListener("click", async () => {
+      if (!supabaseClient || !state.user) {
+        return;
+      }
+
+      await supabaseClient.auth.signOut();
+      updateAuthStatus("You have signed out. You can sign in again or play as a guest.", true);
     });
   }
 }
@@ -363,6 +598,7 @@ function bindOverlayControls() {
 function maybeUpdateBestScore() {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
+    state.bestScoreVehicle = state.selectedVehicle;
     updateBestScoreDisplay();
     saveCloudBestScore();
   }
@@ -385,7 +621,7 @@ function drawFittedCenteredText(ctx, text, x, y, maxWidth, startSize, minSize, c
   ctx.fillText(text, x, y);
 }
 
-function prettifyVehicleName() {
+function prettifyVehicleName(vehicleName = state.selectedVehicle) {
   const names = {
     "bike-street": "Street Bike",
     "bike-speed": "Speed Bike",
@@ -397,10 +633,10 @@ function prettifyVehicleName() {
     "car-truck": "Truck",
   };
 
-  return names[state.selectedVehicle] || "Racing Vehicle";
+  return names[vehicleName] || "Racing Vehicle";
 }
 
-function vehicleAccentColor() {
+function vehicleAccentColor(vehicleName = state.selectedVehicle) {
   const colors = {
     "bike-street": "#4fc3f7",
     "bike-speed": "#ff6b81",
@@ -412,17 +648,17 @@ function vehicleAccentColor() {
     "car-truck": "#90a4ae",
   };
 
-  return colors[state.selectedVehicle] || "#73efff";
+  return colors[vehicleName] || "#73efff";
 }
 
-function drawVehicleBadge(ctx) {
-  const accent = vehicleAccentColor();
-  const isBike = state.selectedVehicle.startsWith("bike-");
-  const isTruck = state.selectedVehicle === "car-truck";
-  const isElectric = state.selectedVehicle.includes("electric");
-  const isMuscle = state.selectedVehicle === "car-muscle";
-  const isSport = state.selectedVehicle === "car-sport";
-  const isDirt = state.selectedVehicle === "bike-dirt";
+function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
+  const accent = vehicleAccentColor(vehicleName);
+  const isBike = vehicleName.startsWith("bike-");
+  const isTruck = vehicleName === "car-truck";
+  const isElectric = vehicleName.includes("electric");
+  const isMuscle = vehicleName === "car-muscle";
+  const isSport = vehicleName === "car-sport";
+  const isDirt = vehicleName === "bike-dirt";
 
   ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
   ctx.fillRect(210, 1100, 660, 450);
@@ -549,6 +785,7 @@ function createScoreCardImage() {
   canvas.height = 1920;
   const ctx = canvas.getContext("2d");
   const scoreCardHighScore = Math.max(state.bestScore, state.score);
+  const scoreCardVehicle = state.bestScoreVehicle || state.selectedVehicle;
 
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gradient.addColorStop(0, "#0f2746");
@@ -603,12 +840,12 @@ function createScoreCardImage() {
   ctx.font = "bold 210px Verdana";
   ctx.fillText(String(scoreCardHighScore), 540, 875);
 
-  drawVehicleBadge(ctx);
+  drawVehicleBadge(ctx, scoreCardVehicle);
 
   ctx.fillStyle = "#73efff";
   ctx.font = "bold 44px Verdana";
-  ctx.fillText("Selected Vehicle", 540, 1470);
-  drawFittedCenteredText(ctx, prettifyVehicleName(), 540, 1530, 520, 58, 34, "#f7fff7");
+  ctx.fillText("Highest Score Vehicle", 540, 1470);
+  drawFittedCenteredText(ctx, prettifyVehicleName(scoreCardVehicle), 540, 1530, 520, 58, 34, "#f7fff7");
 
   ctx.strokeStyle = "rgba(115, 239, 255, 0.7)";
   ctx.lineWidth = 10;

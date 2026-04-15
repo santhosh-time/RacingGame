@@ -250,10 +250,10 @@ body {
   position: absolute;
   inset: 0;
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: center;
   gap: 12px;
-  padding: 24px;
+  padding: 28px 24px 24px;
   text-align: center;
   background: rgba(8, 15, 24, 0.92);
   z-index: 3;
@@ -276,7 +276,7 @@ body {
   width: 100%;
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .auth-actions {
@@ -310,6 +310,13 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.auth-button.tertiary {
+  width: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.24);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .sign-in-form {
   width: 100%;
   display: grid;
@@ -341,6 +348,8 @@ body {
 .auth-status {
   min-height: 1.4em;
   font-size: 0.92rem;
+  line-height: 1.45;
+  width: 100%;
 }
 
 .cloud-status {
@@ -350,6 +359,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   font-size: 0.9rem;
+  line-height: 1.45;
   color: #ffd166;
   background: rgba(255, 255, 255, 0.06);
 }
@@ -362,6 +372,21 @@ body {
 
 .cloud-status.is-error {
   color: #ffd166;
+}
+
+.profile-panel {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-field input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .vehicle-picker {
