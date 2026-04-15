@@ -62,6 +62,38 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Payment signature did not match." }, 400);
   }
 
+  const { data: paymentAttempt, error: paymentAttemptError } = await adminClient
+    .from("access_pass_transactions")
+    .select("amount_paise, currency, transaction_status")
+    .eq("user_id", user.id)
+    .eq("provider_order_id", orderId)
+    .maybeSingle();
+
+  if (paymentAttemptError) {
+    return jsonResponse({ error: `Could not inspect the payment attempt: ${paymentAttemptError.message}` }, 500);
+  }
+
+  if (!paymentAttempt) {
+    return jsonResponse({ error: "This payment attempt could not be matched to your racer." }, 400);
+  }
+
+  if (paymentAttempt.transaction_status === "paid") {
+    const { data: activePass, error: activePassError } = await adminClient
+      .from("access_passes")
+      .select("valid_until")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (activePassError) {
+      return jsonResponse({ error: `Could not confirm the paid pass: ${activePassError.message}` }, 500);
+    }
+
+    return jsonResponse({
+      message: "Access activated.",
+      validUntil: activePass?.valid_until || null,
+    });
+  }
+
   const { data: existingPass } = await adminClient
     .from("access_passes")
     .select("valid_until")
@@ -81,8 +113,8 @@ Deno.serve(async (request) => {
     user_id: user.id,
     racer_name: racerName,
     payment_status: "paid",
-    amount_paise: 100,
-    currency: "INR",
+    amount_paise: paymentAttempt.amount_paise || 100,
+    currency: paymentAttempt.currency || "INR",
     provider_order_id: orderId,
     provider_payment_id: paymentId,
     provider_signature: signature,

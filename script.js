@@ -140,6 +140,20 @@ function overlayRefs() {
   };
 }
 
+function bindElementOnce(element, bindingKey, eventName, handler) {
+  if (!element) {
+    return;
+  }
+
+  const marker = `bound${bindingKey}`;
+  if (element.dataset[marker] === "true") {
+    return;
+  }
+
+  element.addEventListener(eventName, handler);
+  element.dataset[marker] = "true";
+}
+
 function updateCloudStatus(messageText, isReady = false) {
   const { cloudStatus } = overlayRefs();
   if (!cloudStatus) {
@@ -313,7 +327,7 @@ function updateAccessUI() {
   } else {
     payAccessButton.textContent = state.accessActive ? "Extend Another 24 Hours" : "Pay Rs.1 for 24 Hours";
   }
-  startButton.disabled = Boolean(state.user && !state.accessActive);
+  startButton.disabled = false;
 }
 
 function formatPaymentError(error) {
@@ -933,6 +947,30 @@ function updateProfileInputs() {
   }
 }
 
+function guideToPaidAccess() {
+  const { vehicleSetup, accessPanel, payAccessButton } = overlayRefs();
+  if (vehicleSetup?.classList.contains("hidden")) {
+    showVehicleSetup();
+  }
+
+  updateAccessUI();
+
+  if (accessPanel) {
+    accessPanel.classList.add("needs-attention");
+    accessPanel.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    window.setTimeout(() => {
+      accessPanel.classList.remove("needs-attention");
+    }, 1800);
+  }
+
+  window.setTimeout(() => {
+    payAccessButton?.focus();
+  }, 250);
+}
+
 function showVehicleSetup() {
   const { racerGate, vehicleSetup, authRacerNameInput } = overlayRefs();
   racerGate.classList.add("hidden");
@@ -1060,7 +1098,7 @@ function bindOverlayControls() {
 
   vehicleOptions.forEach((option) => {
     option.classList.toggle("selected", option.dataset.vehicle === state.selectedVehicle);
-    option.addEventListener("click", () => {
+    bindElementOnce(option, "VehicleSelect", "click", () => {
       overlayRefs().vehicleOptions.forEach((item) => item.classList.remove("selected"));
       option.classList.add("selected");
       applyVehicleSelection(option.dataset.vehicle);
@@ -1068,11 +1106,11 @@ function bindOverlayControls() {
   });
 
   if (authForm) {
-    authForm.addEventListener("submit", (event) => event.preventDefault());
+    bindElementOnce(authForm, "AuthFormSubmit", "submit", (event) => event.preventDefault());
   }
 
   if (signInButton) {
-    signInButton.addEventListener("click", async () => {
+    bindElementOnce(signInButton, "SignInClick", "click", async () => {
       const email = authEmailInput?.value?.trim();
       const password = authPasswordInput?.value || "";
 
@@ -1095,7 +1133,7 @@ function bindOverlayControls() {
   }
 
   if (signUpButton) {
-    signUpButton.addEventListener("click", async () => {
+    bindElementOnce(signUpButton, "SignUpClick", "click", async () => {
       const email = authEmailInput?.value?.trim();
       const password = authPasswordInput?.value || "";
       const racerName = authRacerNameInput?.value?.trim();
@@ -1135,45 +1173,45 @@ function bindOverlayControls() {
   }
 
   if (guestButton) {
-    guestButton.addEventListener("click", () => {
+    bindElementOnce(guestButton, "GuestClick", "click", () => {
       startGuestMode(authRacerNameInput?.value || "");
     });
   }
 
   if (saveProfileButton) {
-    saveProfileButton.addEventListener("click", saveProfileName);
+    bindElementOnce(saveProfileButton, "SaveProfileClick", "click", saveProfileName);
   }
 
   if (deleteProfileButton) {
-    deleteProfileButton.addEventListener("click", deletePlayerData);
+    bindElementOnce(deleteProfileButton, "DeleteProfileClick", "click", deletePlayerData);
   }
 
   if (feedbackToggleButton) {
-    feedbackToggleButton.addEventListener("click", () => {
+    bindElementOnce(feedbackToggleButton, "FeedbackToggleClick", "click", () => {
       toggleFeedbackPanel(true);
     });
   }
 
   if (cancelFeedbackButton) {
-    cancelFeedbackButton.addEventListener("click", () => {
+    bindElementOnce(cancelFeedbackButton, "FeedbackCancelClick", "click", () => {
       toggleFeedbackPanel(false);
     });
   }
 
   if (sendFeedbackButton) {
-    sendFeedbackButton.addEventListener("click", submitFeedback);
+    bindElementOnce(sendFeedbackButton, "FeedbackSendClick", "click", submitFeedback);
   }
 
   if (payAccessButton) {
-    payAccessButton.addEventListener("click", openPaidAccessCheckout);
+    bindElementOnce(payAccessButton, "PayAccessClick", "click", openPaidAccessCheckout);
   }
 
   if (refreshAccessButton) {
-    refreshAccessButton.addEventListener("click", loadAccessPass);
+    bindElementOnce(refreshAccessButton, "RefreshAccessClick", "click", loadAccessPass);
   }
 
   if (signOutButton) {
-    signOutButton.addEventListener("click", async () => {
+    bindElementOnce(signOutButton, "SignOutClick", "click", async () => {
       if (!state.user) {
         showAuthGate();
         updateAuthStatus(
@@ -2000,7 +2038,7 @@ function gameLoop() {
 async function startGame() {
   if (state.user && !state.accessActive) {
     updateCloudStatus("Your profile is ready, but your 24-hour pass is not active yet. Pay Rs.1 to unlock signed-in play.", false);
-    updateAccessUI();
+    guideToPaidAccess();
     return;
   }
 

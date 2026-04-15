@@ -58,6 +58,24 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Could not clear access pass data." }, 500);
   }
 
+  const { error: transactionsError } = await adminClient
+    .from("access_pass_transactions")
+    .delete()
+    .eq("user_id", user.id);
+
+  if (transactionsError) {
+    return jsonResponse({ error: "Could not clear payment history data." }, 500);
+  }
+
+  const { error: feedbackError } = await adminClient
+    .from("feedback_submissions")
+    .delete()
+    .eq("user_id", user.id);
+
+  if (feedbackError) {
+    return jsonResponse({ error: "Could not clear feedback survey data." }, 500);
+  }
+
   const { error: profileError } = await adminClient
     .from("profiles")
     .delete()

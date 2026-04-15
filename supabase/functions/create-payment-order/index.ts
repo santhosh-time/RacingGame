@@ -54,41 +54,6 @@ Deno.serve(async (request) => {
     String(user.email || "").split("@")[0].trim().slice(0, 18) ||
     "Road Rider";
 
-  const receipt = `viral-${user.id.slice(0, 8)}-${Date.now()}`;
-  const authValue = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
-  const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${authValue}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      amount: amountPaise,
-      currency: "INR",
-      receipt,
-      notes: {
-        user_id: user.id,
-        product: "viral-racing-24-hour-pass",
-      },
-    }),
-  });
-
-  const orderData = await safeJsonResponse(razorpayResponse);
-  if (!razorpayResponse.ok || !orderData?.id) {
-    return jsonResponse({ error: "Could not create a payment order." }, 500);
-  }
-
-  const accessPassPayload = {
-    user_id: user.id,
-    racer_name: racerName,
-    payment_status: "pending",
-    amount_paise: amountPaise,
-    currency: "INR",
-    provider_order_id: orderData.id,
-    provider_payment_id: null,
-    provider_signature: null,
-  };
-
   const { data: existingPass, error: existingPassError } = await adminClient
     .from("access_passes")
     .select("id, payment_status, valid_until, activated_at")
@@ -111,26 +76,28 @@ Deno.serve(async (request) => {
     }, 400);
   }
 
-  const nextAccessPayload = existingPass
-    ? {
-        ...accessPassPayload,
-        payment_status: existingPass.payment_status || "pending",
-        valid_until: existingPass.valid_until || null,
-        activated_at: existingPass.activated_at || null,
-      }
-    : accessPassPayload;
+  const receipt = `viral-${user.id.slice(0, 8)}-${Date.now()}`;
+  const authValue = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
+  const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${authValue}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: amountPaise,
+      currency: "INR",
+      receipt,
+      notes: {
+        user_id: user.id,
+        product: "viral-racing-24-hour-pass",
+      },
+    }),
+  });
 
-  const { error: saveError } = existingPass
-    ? await adminClient
-        .from("access_passes")
-        .update(nextAccessPayload)
-        .eq("user_id", user.id)
-    : await adminClient
-        .from("access_passes")
-        .insert(nextAccessPayload);
-
-  if (saveError) {
-    return jsonResponse({ error: `Could not prepare the access pass: ${saveError.message}` }, 500);
+  const orderData = await safeJsonResponse(razorpayResponse);
+  if (!razorpayResponse.ok || !orderData?.id) {
+    return jsonResponse({ error: "Could not create a payment order." }, 500);
   }
 
   const { error: transactionError } = await adminClient

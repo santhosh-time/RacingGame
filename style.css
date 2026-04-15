@@ -449,6 +449,11 @@ body {
   background: rgba(255, 209, 102, 0.08);
 }
 
+.access-panel.needs-attention {
+  border-color: rgba(255, 209, 102, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.4), 0 0 28px rgba(255, 209, 102, 0.28);
+}
+
 .access-status {
   margin: 0;
   color: #ffe08a;
