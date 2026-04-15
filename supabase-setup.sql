@@ -50,9 +50,24 @@ grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update on public.access_passes to authenticated;
 
 drop policy if exists "users manage own profile" on public.profiles;
-create policy "users manage own profile"
+drop policy if exists "users read own profile" on public.profiles;
+drop policy if exists "users insert own profile" on public.profiles;
+drop policy if exists "users update own profile" on public.profiles;
+create policy "users read own profile"
 on public.profiles
-for all
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "users insert own profile"
+on public.profiles
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "users update own profile"
+on public.profiles
+for update
 to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);

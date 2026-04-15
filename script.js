@@ -112,6 +112,7 @@ function overlayRefs() {
     profileNameInput: document.getElementById("profileNameInput"),
     saveProfileButton: document.getElementById("saveProfileButton"),
     signOutButton: document.getElementById("signOutButton"),
+    deleteProfileButton: document.getElementById("deleteProfileButton"),
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
@@ -264,27 +265,43 @@ async function loadProfile() {
     }
 
     if (!data) {
-      const { error: insertError } = await supabaseClient
+      const starterName = defaultRacerNameForUser();
+      const { error: upsertError } = await supabaseClient
         .from("profiles")
-        .insert({
+        .upsert({
           user_id: state.user.id,
-          racer_name: defaultRacerNameForUser(),
+          racer_name: starterName,
           best_score: 0,
           favorite_vehicle: state.selectedVehicle,
           best_score_vehicle: state.selectedVehicle,
-        });
+        }, { onConflict: "user_id" });
 
-      if (insertError) {
-        throw insertError;
+      if (upsertError) {
+        throw upsertError;
       }
 
-      state.racerName = defaultRacerNameForUser();
-      state.bestScore = 0;
-      state.bestScoreVehicle = state.selectedVehicle;
+      const { data: createdProfile, error: createdProfileError } = await supabaseClient
+        .from("profiles")
+        .select("racer_name, best_score, favorite_vehicle, best_score_vehicle")
+        .eq("user_id", state.user.id)
+        .maybeSingle();
+
+      if (createdProfileError) {
+        throw createdProfileError;
+      }
+
+      state.racerName = createdProfile?.racer_name || starterName;
+      state.bestScore = Number(createdProfile?.best_score) || 0;
+      state.bestScoreVehicle = vehicleClasses.includes(createdProfile?.best_score_vehicle)
+        ? createdProfile.best_score_vehicle
+        : (vehicleClasses.includes(createdProfile?.favorite_vehicle) ? createdProfile.favorite_vehicle : state.selectedVehicle);
+      if (createdProfile?.favorite_vehicle && vehicleClasses.includes(createdProfile.favorite_vehicle)) {
+        applyVehicleSelection(createdProfile.favorite_vehicle);
+      }
       updateBestScoreDisplay();
       updateProfileInputs();
       updateSessionModeText();
-      updateCloudStatus(`${state.racerName}, your best score is 0 for now. Let's set a new record.`, true);
+      updateCloudStatus(`${state.racerName}, your best score is ${state.bestScore} for now. Let's set a new record.`, true);
       return;
     }
 
@@ -377,6 +394,45 @@ async function saveProfileName() {
   }
 }
 
+async function deletePlayerData() {
+  if (!state.user || !supabaseClient) {
+    return;
+  }
+
+  const wantsToDelete = window.confirm(
+    "Last chance, racer.\n\nIf you wipe this garage, your saved best score, racer name, and access passes will disappear from The Viral Alien game.\n\nAre you sure you want to delete everything?",
+  );
+
+  if (!wantsToDelete) {
+    updateCloudStatus("Your saved progress is still safe in the garage.", true);
+    return;
+  }
+
+  try {
+    updateCloudStatus("Wiping your garage and closing your account...", false);
+
+    const { error } = await supabaseClient.functions.invoke("delete-account", {
+      body: {
+        confirmDelete: true,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    updateCloudStatus("Your saved game data has been cleared.", true);
+    updateAuthStatus("Your garage has been wiped. If you want back in, build a fresh racer and hit the road again.", true);
+    await supabaseClient.auth.signOut();
+  } catch (error) {
+    updateCloudStatus(
+      formatSupabaseError(error, "We could not delete your saved data right now."),
+      false,
+    );
+    console.error("Supabase delete profile error:", error);
+  }
+}
+
 function updateSessionModeText() {
   const { sessionModeText } = overlayRefs();
   if (sessionModeText) {
@@ -387,7 +443,7 @@ function updateSessionModeText() {
 }
 
 function updateProfileInputs() {
-  const { profileNameInput, saveProfileButton, signOutButton } = overlayRefs();
+  const { profileNameInput, saveProfileButton, signOutButton, deleteProfileButton } = overlayRefs();
   if (profileNameInput) {
     profileNameInput.value = isGuestRacerName() ? "" : state.racerName;
     profileNameInput.disabled = !state.user;
@@ -396,7 +452,11 @@ function updateProfileInputs() {
     saveProfileButton.disabled = !state.user;
   }
   if (signOutButton) {
-    signOutButton.disabled = !state.user;
+    signOutButton.disabled = false;
+    signOutButton.textContent = state.user ? "Sign Out" : "Sign In / Change Player";
+  }
+  if (deleteProfileButton) {
+    deleteProfileButton.disabled = !state.user;
   }
 }
 
@@ -496,6 +556,7 @@ function bindOverlayControls() {
     guestButton,
     saveProfileButton,
     signOutButton,
+    deleteProfileButton,
   } = overlayRefs();
 
   vehicleOptions.forEach((option) => {
@@ -552,6 +613,7 @@ function bindOverlayControls() {
           email,
           password,
           options: {
+            emailRedirectTo: "https://santhosh-time.github.io/RacingGame/",
             data: {
               racer_name: racerName || "Road Rider",
             },
@@ -583,9 +645,22 @@ function bindOverlayControls() {
     saveProfileButton.addEventListener("click", saveProfileName);
   }
 
+  if (deleteProfileButton) {
+    deleteProfileButton.addEventListener("click", deletePlayerData);
+  }
+
   if (signOutButton) {
     signOutButton.addEventListener("click", async () => {
-      if (!supabaseClient || !state.user) {
+      if (!state.user) {
+        showAuthGate();
+        updateAuthStatus(
+          "Sign in to keep your racer profile and best score updated, or jump in as a guest for local play.",
+          true,
+        );
+        return;
+      }
+
+      if (!supabaseClient) {
         return;
       }
 

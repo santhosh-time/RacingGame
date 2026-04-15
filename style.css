@@ -317,6 +317,28 @@ body {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.auth-button.danger {
+  border: 1px solid rgba(255, 122, 122, 0.35);
+  color: #ffd8d8;
+  background: rgba(164, 34, 34, 0.22);
+}
+
+.delete-profile-button {
+  width: auto;
+  min-width: 150px;
+  justify-self: center;
+  padding-inline: 18px;
+  min-height: 42px;
+  font-size: 0.9rem;
+  margin-top: 16px;
+  align-self: end;
+}
+
+.delete-profile-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .sign-in-form {
   width: 100%;
   display: grid;
@@ -343,6 +365,15 @@ body {
   padding: 0 14px;
   color: var(--text);
   background: rgba(255, 255, 255, 0.08);
+}
+
+#authPasswordInput {
+  color-scheme: dark;
+}
+
+#authPasswordInput::-ms-reveal,
+#authPasswordInput::-ms-clear {
+  filter: invert(1);
 }
 
 .auth-status {
