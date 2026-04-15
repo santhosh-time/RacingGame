@@ -830,34 +830,61 @@ body.level-3 {
   }
 
   .hud {
-    gap: 10px;
-    padding: 12px 14px;
+    gap: 8px;
+    padding: 8px 10px;
     margin: 0 10px;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stat-card,
+  .compact-stat {
+    min-width: 0;
+  }
+
+  .stat-card h1,
+  #score,
+  #bestScore {
+    font-size: 1.12rem;
+  }
+
+  #speedDisplay,
+  #fuelDisplay,
+  #levelDisplay,
+  #livesDisplay {
+    font-size: 0.98rem;
+  }
+
+  .label {
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
   }
 
   .start-button {
-    grid-column: 1 / -1;
     width: 100%;
-    min-height: 48px;
+    min-height: 38px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
   }
 
   .hud-actions {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .sound-button {
     width: 100%;
-    min-height: 44px;
+    min-height: 38px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
   }
 
   .game-area {
     width: calc(100vw - 20px);
     max-width: 390px;
-    height: min(58dvh, 500px);
+    height: min(64dvh, 540px);
     border-left-width: 6px;
     border-right-width: 6px;
   }
@@ -865,7 +892,7 @@ body.level-3 {
   .touch-controls {
     width: calc(100vw - 20px);
     max-width: 390px;
-    gap: 10px;
+    gap: 8px;
     position: sticky;
     bottom: 8px;
     z-index: 4;
@@ -887,5 +914,51 @@ body.level-3 {
   .touch-button {
     min-height: 52px;
     font-size: 0.95rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 900px) {
+  .app {
+    width: min(96vw, 860px);
+    gap: 12px;
+    padding: 10px 0;
+  }
+
+  .hud {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .stat-card,
+  .compact-stat {
+    min-width: 82px;
+  }
+
+  .stat-card h1,
+  #score,
+  #bestScore {
+    font-size: 1.28rem;
+  }
+
+  #speedDisplay,
+  #fuelDisplay,
+  #levelDisplay,
+  #livesDisplay {
+    font-size: 1.08rem;
+  }
+
+  .label {
+    font-size: 0.7rem;
+  }
+
+  .start-button,
+  .sound-button {
+    min-height: 40px;
+    padding: 9px 12px;
+    font-size: 0.84rem;
+  }
+
+  .game-area {
+    height: min(67dvh, 560px);
   }
 }
