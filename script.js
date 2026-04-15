@@ -113,6 +113,14 @@ function overlayRefs() {
     saveProfileButton: document.getElementById("saveProfileButton"),
     signOutButton: document.getElementById("signOutButton"),
     deleteProfileButton: document.getElementById("deleteProfileButton"),
+    feedbackToggleButton: document.getElementById("feedbackToggleButton"),
+    feedbackPanel: document.getElementById("feedbackPanel"),
+    feedbackRatingInput: document.getElementById("feedbackRatingInput"),
+    feedbackMessageInput: document.getElementById("feedbackMessageInput"),
+    feedbackEmailInput: document.getElementById("feedbackEmailInput"),
+    feedbackStatus: document.getElementById("feedbackStatus"),
+    sendFeedbackButton: document.getElementById("sendFeedbackButton"),
+    cancelFeedbackButton: document.getElementById("cancelFeedbackButton"),
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
@@ -157,6 +165,65 @@ function updateAuthStatus(messageText, isReady = false) {
 
   authStatus.textContent = messageText;
   authStatus.classList.toggle("is-connected", isReady);
+}
+
+function updateFeedbackStatus(messageText, isReady = false) {
+  const { feedbackStatus } = overlayRefs();
+  if (!feedbackStatus) {
+    return;
+  }
+
+  feedbackStatus.textContent = messageText;
+  feedbackStatus.classList.toggle("is-connected", isReady);
+}
+
+function resetFeedbackForm() {
+  const {
+    feedbackRatingInput,
+    feedbackMessageInput,
+    feedbackEmailInput,
+  } = overlayRefs();
+
+  if (feedbackRatingInput) {
+    feedbackRatingInput.value = "5";
+  }
+  if (feedbackMessageInput) {
+    feedbackMessageInput.value = "";
+  }
+  if (feedbackEmailInput) {
+    feedbackEmailInput.value = state.user?.email || "";
+  }
+
+  updateFeedbackStatus("Your feedback helps us tune the next ride.", true);
+}
+
+function toggleFeedbackPanel(showPanel) {
+  const { feedbackPanel, feedbackToggleButton } = overlayRefs();
+  if (!feedbackPanel || !feedbackToggleButton) {
+    return;
+  }
+
+  feedbackPanel.classList.toggle("hidden", !showPanel);
+  feedbackToggleButton.classList.toggle("hidden", showPanel);
+
+  if (showPanel) {
+    resetFeedbackForm();
+  }
+}
+
+function formatFeedbackError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  const name = String(error?.name || "").toLowerCase();
+
+  if (message.includes("failed to send a request to the edge function")) {
+    return "The feedback garage is not live yet. Give it another moment and try again.";
+  }
+
+  if (name.includes("function") || message.includes("function")) {
+    return "We could not deliver your feedback just yet. Try again in a moment.";
+  }
+
+  return "We could not send your feedback right now. Try again in a moment.";
 }
 
 function withTimeout(promise, timeoutMs = 6000) {
@@ -433,6 +500,67 @@ async function deletePlayerData() {
   }
 }
 
+async function submitFeedback() {
+  if (!supabaseClient) {
+    updateFeedbackStatus("Feedback is not ready yet. Reload the game and try again.", false);
+    return;
+  }
+
+  const {
+    feedbackRatingInput,
+    feedbackMessageInput,
+    feedbackEmailInput,
+    sendFeedbackButton,
+    cancelFeedbackButton,
+  } = overlayRefs();
+
+  const rating = Number(feedbackRatingInput?.value || 5);
+  const feedbackText = feedbackMessageInput?.value?.trim() || "";
+  const email = feedbackEmailInput?.value?.trim() || state.user?.email || "";
+
+  if (!feedbackText) {
+    updateFeedbackStatus("Tell us a little about your ride before sending feedback.", false);
+    return;
+  }
+
+  sendFeedbackButton.disabled = true;
+  if (cancelFeedbackButton) {
+    cancelFeedbackButton.disabled = true;
+  }
+  updateFeedbackStatus("Sending your feedback to the garage team...", false);
+
+  try {
+    const { error } = await supabaseClient.functions.invoke("submit-feedback", {
+      body: {
+        racerName: state.racerName,
+        email,
+        rating,
+        message: feedbackText,
+        vehicle: state.selectedVehicle,
+        bestScore: state.bestScore,
+        playMode: state.user ? "signed-in" : "guest",
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    updateFeedbackStatus("Thanks for the feedback. The garage team has it now.", true);
+    if (feedbackMessageInput) {
+      feedbackMessageInput.value = "";
+    }
+  } catch (error) {
+    updateFeedbackStatus(formatFeedbackError(error), false);
+    console.error("Supabase feedback submit error:", error);
+  } finally {
+    sendFeedbackButton.disabled = false;
+    if (cancelFeedbackButton) {
+      cancelFeedbackButton.disabled = false;
+    }
+  }
+}
+
 function updateSessionModeText() {
   const { sessionModeText } = overlayRefs();
   if (sessionModeText) {
@@ -470,12 +598,14 @@ function showVehicleSetup() {
   updateProfileInputs();
   updateSessionModeText();
   updateBestScoreDisplay();
+  toggleFeedbackPanel(false);
 }
 
 function showAuthGate() {
   const { racerGate, vehicleSetup } = overlayRefs();
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
+  toggleFeedbackPanel(false);
 }
 
 function startGuestMode(name = "") {
@@ -557,6 +687,9 @@ function bindOverlayControls() {
     saveProfileButton,
     signOutButton,
     deleteProfileButton,
+    feedbackToggleButton,
+    sendFeedbackButton,
+    cancelFeedbackButton,
   } = overlayRefs();
 
   vehicleOptions.forEach((option) => {
@@ -647,6 +780,22 @@ function bindOverlayControls() {
 
   if (deleteProfileButton) {
     deleteProfileButton.addEventListener("click", deletePlayerData);
+  }
+
+  if (feedbackToggleButton) {
+    feedbackToggleButton.addEventListener("click", () => {
+      toggleFeedbackPanel(true);
+    });
+  }
+
+  if (cancelFeedbackButton) {
+    cancelFeedbackButton.addEventListener("click", () => {
+      toggleFeedbackPanel(false);
+    });
+  }
+
+  if (sendFeedbackButton) {
+    sendFeedbackButton.addEventListener("click", submitFeedback);
   }
 
   if (signOutButton) {

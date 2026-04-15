@@ -125,7 +125,36 @@
             </div>
 
             <p>Use Left and Right to dodge, Down to remove one boost level.</p>
-            <button id="deleteProfileButton" class="auth-button danger delete-profile-button" type="button">Delete Account</button>
+            <div class="account-secondary-actions">
+              <button id="deleteProfileButton" class="auth-button danger delete-profile-button" type="button">Delete Account</button>
+              <button id="feedbackToggleButton" class="auth-button tertiary feedback-toggle-button" type="button">Feedback Survey</button>
+            </div>
+            <div id="feedbackPanel" class="feedback-panel hidden">
+              <p class="feedback-intro">Tell us how the ride felt and what would make Viral Racing Game even better.</p>
+              <label class="field">
+                <span>How was your drive?</span>
+                <select id="feedbackRatingInput">
+                  <option value="5">5 - Amazing</option>
+                  <option value="4">4 - Really Good</option>
+                  <option value="3">3 - Solid</option>
+                  <option value="2">2 - Needs Work</option>
+                  <option value="1">1 - Rough Ride</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>What should we improve?</span>
+                <textarea id="feedbackMessageInput" rows="4" maxlength="600" placeholder="Tell us what felt great, what felt off, or what you want to see next."></textarea>
+              </label>
+              <label class="field">
+                <span>Contact email (optional)</span>
+                <input id="feedbackEmailInput" type="email" placeholder="you@example.com" autocomplete="email">
+              </label>
+              <div class="auth-actions compact">
+                <button id="sendFeedbackButton" class="auth-button primary" type="button">Send Feedback</button>
+                <button id="cancelFeedbackButton" class="auth-button secondary" type="button">Close</button>
+              </div>
+              <p id="feedbackStatus" class="auth-status">Your feedback helps us tune the next ride.</p>
+            </div>
           </div>
         </div>
       </div>

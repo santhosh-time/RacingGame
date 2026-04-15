@@ -42,8 +42,34 @@ alter table public.access_passes add column if not exists amount_paise integer n
 alter table public.access_passes add column if not exists valid_until timestamptz;
 alter table public.access_passes add column if not exists created_at timestamptz not null default timezone('utc', now());
 
+create table if not exists public.feedback_submissions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
+  racer_name text not null,
+  email text,
+  rating integer not null check (rating between 1 and 5),
+  feedback_text text not null,
+  vehicle_name text,
+  best_score integer not null default 0,
+  play_mode text not null default 'guest',
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.feedback_submissions add column if not exists user_id uuid;
+alter table public.feedback_submissions add column if not exists racer_name text;
+alter table public.feedback_submissions add column if not exists email text;
+alter table public.feedback_submissions add column if not exists rating integer;
+alter table public.feedback_submissions add column if not exists feedback_text text;
+alter table public.feedback_submissions add column if not exists vehicle_name text;
+alter table public.feedback_submissions add column if not exists best_score integer not null default 0;
+alter table public.feedback_submissions add column if not exists play_mode text not null default 'guest';
+alter table public.feedback_submissions add column if not exists created_at timestamptz not null default timezone('utc', now());
+alter table public.feedback_submissions drop constraint if exists feedback_submissions_rating_check;
+alter table public.feedback_submissions add constraint feedback_submissions_rating_check check (rating between 1 and 5);
+
 alter table public.profiles enable row level security;
 alter table public.access_passes enable row level security;
+alter table public.feedback_submissions enable row level security;
 
 grant usage on schema public to authenticated;
 grant select, insert, update on public.profiles to authenticated;

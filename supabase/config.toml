@@ -2,3 +2,6 @@ project_id = "tvmvkjoubttuqnlkdciv"
 
 [functions."delete-account"]
 verify_jwt = false
+
+[functions."submit-feedback"]
+verify_jwt = false
