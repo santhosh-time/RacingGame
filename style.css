@@ -438,6 +438,22 @@ body {
   color: #ffd166;
 }
 
+.access-panel {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  background: rgba(255, 209, 102, 0.08);
+}
+
+.access-status {
+  margin: 0;
+  color: #ffe08a;
+  line-height: 1.45;
+}
+
 .profile-panel {
   width: 100%;
   display: grid;

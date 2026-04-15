@@ -32,15 +32,26 @@ create table if not exists public.access_passes (
   user_id uuid not null references auth.users(id) on delete cascade,
   payment_status text not null default 'pending',
   amount_paise integer not null default 100,
+  currency text not null default 'INR',
+  provider_order_id text,
+  provider_payment_id text,
+  provider_signature text,
   valid_until timestamptz,
+  activated_at timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
 
 alter table public.access_passes add column if not exists user_id uuid;
 alter table public.access_passes add column if not exists payment_status text not null default 'pending';
 alter table public.access_passes add column if not exists amount_paise integer not null default 100;
+alter table public.access_passes add column if not exists currency text not null default 'INR';
+alter table public.access_passes add column if not exists provider_order_id text;
+alter table public.access_passes add column if not exists provider_payment_id text;
+alter table public.access_passes add column if not exists provider_signature text;
 alter table public.access_passes add column if not exists valid_until timestamptz;
+alter table public.access_passes add column if not exists activated_at timestamptz;
 alter table public.access_passes add column if not exists created_at timestamptz not null default timezone('utc', now());
+create unique index if not exists access_passes_user_id_key on public.access_passes (user_id);
 
 create table if not exists public.feedback_submissions (
   id uuid primary key default gen_random_uuid(),

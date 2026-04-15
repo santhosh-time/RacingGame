@@ -67,6 +67,13 @@
             <h2>Choose Your Vehicle</h2>
             <p id="sessionModeText">Racer ready. Best score is tracked for this session.</p>
             <p id="cloudStatus" class="cloud-status">Checking your game progress...</p>
+            <div id="accessPanel" class="access-panel hidden">
+              <p id="accessStatus" class="access-status">Checking your 24-hour pass...</p>
+              <div class="auth-actions compact">
+                <button id="payAccessButton" class="auth-button primary" type="button">Pay Rs.1 for 24 Hours</button>
+                <button id="refreshAccessButton" class="auth-button secondary" type="button">Check My Pass</button>
+              </div>
+            </div>
             <div class="profile-panel">
               <label class="field profile-field">
                 <span>Profile Racer Name</span>
@@ -168,6 +175,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

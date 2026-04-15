@@ -52,6 +52,8 @@ const boosterSpawnTop = -140;
 const boosterCollectionZoneTop = 340;
 const boosterSafetyDistance = 170;
 const boosterWidth = 38;
+const guestRunLimit = 3;
+const guestRunsStorageKey = "viral-racing-guest-runs";
 
 const state = {
   active: false,
@@ -78,6 +80,9 @@ const state = {
   racerName: "Guest Racer",
   bestScore: 0,
   bestScoreVehicle: "bike-street",
+  accessActive: false,
+  accessValidUntil: "",
+  accessBusy: false,
 };
 
 const audioState = {
@@ -109,6 +114,10 @@ function overlayRefs() {
     authStatus: document.getElementById("authStatus"),
     sessionModeText: document.getElementById("sessionModeText"),
     cloudStatus: document.getElementById("cloudStatus"),
+    accessPanel: document.getElementById("accessPanel"),
+    accessStatus: document.getElementById("accessStatus"),
+    payAccessButton: document.getElementById("payAccessButton"),
+    refreshAccessButton: document.getElementById("refreshAccessButton"),
     profileNameInput: document.getElementById("profileNameInput"),
     saveProfileButton: document.getElementById("saveProfileButton"),
     signOutButton: document.getElementById("signOutButton"),
@@ -143,6 +152,36 @@ function isGuestRacerName(name = state.racerName) {
   return !name || name.trim().toLowerCase() === "guest racer";
 }
 
+function getGuestRunsUsed() {
+  try {
+    return Math.max(0, Number(window.localStorage.getItem(guestRunsStorageKey)) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function setGuestRunsUsed(count) {
+  try {
+    window.localStorage.setItem(guestRunsStorageKey, String(Math.max(0, count)));
+  } catch {
+    // Ignore storage write failures and keep guest mode usable for the session.
+  }
+}
+
+function getGuestRunsRemaining() {
+  return Math.max(0, guestRunLimit - getGuestRunsUsed());
+}
+
+function isGuestLimitReached() {
+  return getGuestRunsRemaining() <= 0;
+}
+
+function consumeGuestRun() {
+  const nextValue = Math.min(guestRunLimit, getGuestRunsUsed() + 1);
+  setGuestRunsUsed(nextValue);
+  return nextValue;
+}
+
 function defaultRacerNameForUser(user = state.user) {
   const metadataName = user?.user_metadata?.racer_name;
   if (metadataName && String(metadataName).trim()) {
@@ -167,6 +206,23 @@ function updateAuthStatus(messageText, isReady = false) {
   authStatus.classList.toggle("is-connected", isReady);
 }
 
+function updateGuestAccessUI() {
+  const { guestButton, authStatus } = overlayRefs();
+  if (!guestButton) {
+    return;
+  }
+
+  const remaining = getGuestRunsRemaining();
+  guestButton.disabled = remaining <= 0;
+  guestButton.textContent = remaining <= 0
+    ? "Guest Mode Over"
+    : `Play As Guest (${remaining} Left)`;
+
+  if (!state.user && remaining <= 0 && authStatus) {
+    updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+  }
+}
+
 function updateFeedbackStatus(messageText, isReady = false) {
   const { feedbackStatus } = overlayRefs();
   if (!feedbackStatus) {
@@ -175,6 +231,87 @@ function updateFeedbackStatus(messageText, isReady = false) {
 
   feedbackStatus.textContent = messageText;
   feedbackStatus.classList.toggle("is-connected", isReady);
+}
+
+function formatAccessExpiry(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function updateAccessUI() {
+  const { accessPanel, accessStatus, payAccessButton, refreshAccessButton } = overlayRefs();
+  if (!accessPanel || !accessStatus || !payAccessButton || !refreshAccessButton) {
+    return;
+  }
+
+  if (!state.user) {
+    accessPanel.classList.add("hidden");
+    startButton.disabled = false;
+    return;
+  }
+
+  accessPanel.classList.remove("hidden");
+  const expiryText = formatAccessExpiry(state.accessValidUntil);
+  accessStatus.textContent = state.accessActive
+    ? `${state.racerName}, your paid pass is active until ${expiryText}.`
+    : expiryText
+      ? `${state.racerName}, your last pass expired. Pay Rs.1 to reactivate until 24 hours from payment.`
+      : `${state.racerName}, pay Rs.1 to unlock 24 hours of signed-in play. Your scores and profile stay saved either way.`;
+
+  payAccessButton.disabled = state.accessBusy;
+  refreshAccessButton.disabled = state.accessBusy;
+  payAccessButton.textContent = state.accessActive ? "Extend Another 24 Hours" : "Pay Rs.1 for 24 Hours";
+  startButton.disabled = Boolean(state.user && !state.accessActive);
+}
+
+function formatPaymentError(error) {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (message.includes("failed to send a request to the edge function")) {
+    return "The payment lane is not live yet. Give it a moment and try again.";
+  }
+
+  if (message.includes("payment cancelled")) {
+    return "Payment was cancelled before the pass was activated.";
+  }
+
+  return "We could not activate your 24-hour pass right now. Try again in a moment.";
+}
+
+async function readFunctionErrorMessage(error, fallbackMessage) {
+  const context = error?.context;
+  if (!context || typeof context.clone !== "function") {
+    return formatPaymentError(error) || fallbackMessage;
+  }
+
+  try {
+    const payload = await context.clone().json();
+    if (payload?.error) {
+      return String(payload.error);
+    }
+  } catch {
+    try {
+      const text = await context.clone().text();
+      if (text && text.trim()) {
+        return text.trim();
+      }
+    } catch {
+      return formatPaymentError(error) || fallbackMessage;
+    }
+  }
+
+  return formatPaymentError(error) || fallbackMessage;
 }
 
 function resetFeedbackForm() {
@@ -461,6 +598,138 @@ async function saveProfileName() {
   }
 }
 
+async function loadAccessPass() {
+  if (!state.user || !supabaseClient) {
+    state.accessActive = false;
+    state.accessValidUntil = "";
+    updateAccessUI();
+    return;
+  }
+
+  state.accessBusy = true;
+  updateAccessUI();
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("access_passes")
+      .select("payment_status, valid_until")
+      .eq("user_id", state.user.id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const validUntil = data?.valid_until || "";
+    const validDate = validUntil ? new Date(validUntil) : null;
+    state.accessValidUntil = validUntil;
+    state.accessActive = Boolean(
+      data &&
+      data.payment_status === "paid" &&
+      validDate &&
+      !Number.isNaN(validDate.getTime()) &&
+      validDate.getTime() > Date.now()
+    );
+  } catch (error) {
+    state.accessActive = false;
+    updateCloudStatus(formatSupabaseError(error, "We could not check your paid access yet."), false);
+    console.error("Supabase access pass load error:", error);
+  } finally {
+    state.accessBusy = false;
+    updateAccessUI();
+  }
+}
+
+async function openPaidAccessCheckout() {
+  if (!state.user || !supabaseClient || state.accessBusy) {
+    return;
+  }
+
+  if (typeof window.Razorpay !== "function") {
+    updateCloudStatus("The payment gate is not ready yet. Reload and try again.", false);
+    return;
+  }
+
+  state.accessBusy = true;
+  updateAccessUI();
+  updateCloudStatus("Opening the Rs.1 access gate...", false);
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("create-payment-order", {
+      body: {
+        amountPaise: 100,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const checkout = new window.Razorpay({
+      key: data.keyId,
+      amount: data.amount,
+      currency: data.currency,
+      name: "Viral Racing Game",
+      description: "24-hour play access",
+      order_id: data.orderId,
+      handler: async (response) => {
+        try {
+          const { error: verifyError } = await supabaseClient.functions.invoke("verify-payment", {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            },
+          });
+
+          if (verifyError) {
+            throw verifyError;
+          }
+
+          await loadAccessPass();
+          updateCloudStatus("Payment received. Your 24-hour pass is now live.", true);
+        } catch (verificationError) {
+          updateCloudStatus(
+            await readFunctionErrorMessage(
+              verificationError,
+              "We could not activate your 24-hour pass right now. Try again in a moment.",
+            ),
+            false,
+          );
+          console.error("Razorpay verify error:", verificationError);
+        }
+      },
+      prefill: {
+        email: state.user.email || "",
+        name: state.racerName,
+      },
+      theme: {
+        color: "#ffd166",
+      },
+      modal: {
+        ondismiss: () => {
+          state.accessBusy = false;
+          updateAccessUI();
+          updateCloudStatus("Payment window closed. Your pass has not changed.", true);
+        },
+      },
+    });
+
+    checkout.open();
+  } catch (error) {
+    updateCloudStatus(
+      await readFunctionErrorMessage(
+        error,
+        "We could not activate your 24-hour pass right now. Try again in a moment.",
+      ),
+      false,
+    );
+    console.error("Razorpay create order error:", error);
+    state.accessBusy = false;
+    updateAccessUI();
+  }
+}
+
 async function deletePlayerData() {
   if (!state.user || !supabaseClient) {
     return;
@@ -571,7 +840,14 @@ function updateSessionModeText() {
 }
 
 function updateProfileInputs() {
-  const { profileNameInput, saveProfileButton, signOutButton, deleteProfileButton } = overlayRefs();
+  const {
+    profileNameInput,
+    saveProfileButton,
+    signOutButton,
+    deleteProfileButton,
+    payAccessButton,
+    refreshAccessButton,
+  } = overlayRefs();
   if (profileNameInput) {
     profileNameInput.value = isGuestRacerName() ? "" : state.racerName;
     profileNameInput.disabled = !state.user;
@@ -586,6 +862,12 @@ function updateProfileInputs() {
   if (deleteProfileButton) {
     deleteProfileButton.disabled = !state.user;
   }
+  if (payAccessButton) {
+    payAccessButton.disabled = !state.user || state.accessBusy;
+  }
+  if (refreshAccessButton) {
+    refreshAccessButton.disabled = !state.user || state.accessBusy;
+  }
 }
 
 function showVehicleSetup() {
@@ -598,6 +880,8 @@ function showVehicleSetup() {
   updateProfileInputs();
   updateSessionModeText();
   updateBestScoreDisplay();
+  updateAccessUI();
+  updateGuestAccessUI();
   toggleFeedbackPanel(false);
 }
 
@@ -605,18 +889,30 @@ function showAuthGate() {
   const { racerGate, vehicleSetup } = overlayRefs();
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
+  updateAccessUI();
+  updateGuestAccessUI();
   toggleFeedbackPanel(false);
 }
 
 function startGuestMode(name = "") {
+  if (isGuestLimitReached()) {
+    showAuthGate();
+    updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+    updateGuestAccessUI();
+    return;
+  }
+
   state.user = null;
   state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
   state.bestScore = 0;
   state.cloudSyncActive = false;
+  state.accessActive = true;
+  state.accessValidUntil = "";
   updateBestScoreDisplay();
   updateSessionModeText();
   updateProfileInputs();
-  updateCloudStatus("Guest mode is ready. Your score will stay on this device only.", true);
+  updateAccessUI();
+  updateCloudStatus(`Guest mode is ready. ${getGuestRunsRemaining()} guest tries are left on this device.`, true);
   updateAuthStatus("Guest mode is ready. You can sign in later whenever you want.", true);
   showVehicleSetup();
 }
@@ -624,9 +920,12 @@ function startGuestMode(name = "") {
 function showGuestProfileEditor() {
   state.racerName = "Guest Racer";
   state.bestScore = 0;
+  state.accessActive = false;
+  state.accessValidUntil = "";
   updateBestScoreDisplay();
   updateProfileInputs();
   updateSessionModeText();
+  updateAccessUI();
 }
 
 async function handleSessionChange(session) {
@@ -637,11 +936,13 @@ async function handleSessionChange(session) {
     showGuestProfileEditor();
     showAuthGate();
     updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
+    updateGuestAccessUI();
     return;
   }
 
   updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
   await loadProfile();
+  await loadAccessPass();
   showVehicleSetup();
 }
 
@@ -690,6 +991,8 @@ function bindOverlayControls() {
     feedbackToggleButton,
     sendFeedbackButton,
     cancelFeedbackButton,
+    payAccessButton,
+    refreshAccessButton,
   } = overlayRefs();
 
   vehicleOptions.forEach((option) => {
@@ -796,6 +1099,14 @@ function bindOverlayControls() {
 
   if (sendFeedbackButton) {
     sendFeedbackButton.addEventListener("click", submitFeedback);
+  }
+
+  if (payAccessButton) {
+    payAccessButton.addEventListener("click", openPaidAccessCheckout);
+  }
+
+  if (refreshAccessButton) {
+    refreshAccessButton.addEventListener("click", loadAccessPass);
   }
 
   if (signOutButton) {
@@ -1624,6 +1935,32 @@ function gameLoop() {
 }
 
 async function startGame() {
+  if (state.user && !state.accessActive) {
+    updateCloudStatus("Your profile is ready, but your 24-hour pass is not active yet. Pay Rs.1 to unlock signed-in play.", false);
+    updateAccessUI();
+    return;
+  }
+
+  if (!state.user) {
+    if (isGuestLimitReached()) {
+      showAuthGate();
+      updateCloudStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+      updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+      updateGuestAccessUI();
+      return;
+    }
+
+    const usedRuns = consumeGuestRun();
+    const remainingRuns = Math.max(0, guestRunLimit - usedRuns);
+    updateCloudStatus(
+      remainingRuns > 0
+        ? `Guest mode is active. ${remainingRuns} guest tries are left on this device.`
+        : "Guest mode is over on this device after this run. Sign in to keep racing next time.",
+      remainingRuns > 0,
+    );
+    updateGuestAccessUI();
+  }
+
   cancelAnimationFrame(state.animationId);
   syncGameBounds();
   await primeMobileAudio();
