@@ -99,6 +99,18 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: `Could not inspect the access pass: ${existingPassError.message}` }, 500);
   }
 
+  const existingExpiryMs = existingPass?.valid_until ? new Date(existingPass.valid_until).getTime() : 0;
+  const renewalAvailableAtMs = existingExpiryMs - 24 * 60 * 60 * 1000;
+  if (
+    existingPass?.payment_status === "paid" &&
+    !Number.isNaN(existingExpiryMs) &&
+    renewalAvailableAtMs > Date.now() + 1000
+  ) {
+    return jsonResponse({
+      error: `Your pass is already stacked ahead. You can renew again after ${new Date(renewalAvailableAtMs).toISOString()}.`,
+    }, 400);
+  }
+
   const nextAccessPayload = existingPass
     ? {
         ...accessPassPayload,
@@ -119,6 +131,24 @@ Deno.serve(async (request) => {
 
   if (saveError) {
     return jsonResponse({ error: `Could not prepare the access pass: ${saveError.message}` }, 500);
+  }
+
+  const { error: transactionError } = await adminClient
+    .from("access_pass_transactions")
+    .insert({
+      user_id: user.id,
+      racer_name: racerName,
+      amount_paise: amountPaise,
+      currency: "INR",
+      transaction_status: "pending",
+      provider_order_id: orderData.id,
+      provider_payment_id: null,
+      provider_signature: null,
+      failure_reason: null,
+    });
+
+  if (transactionError) {
+    return jsonResponse({ error: `Could not record the payment attempt: ${transactionError.message}` }, 500);
   }
 
   return jsonResponse({

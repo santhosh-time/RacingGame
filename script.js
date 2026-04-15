@@ -54,6 +54,8 @@ const boosterSafetyDistance = 170;
 const boosterWidth = 38;
 const guestRunLimit = 3;
 const guestRunsStorageKey = "viral-racing-guest-runs";
+const accessWindowHours = 24;
+const maxAccessHours = 48;
 
 const state = {
   active: false,
@@ -83,6 +85,7 @@ const state = {
   accessActive: false,
   accessValidUntil: "",
   accessBusy: false,
+  pendingPaymentOrderId: "",
 };
 
 const audioState = {
@@ -249,6 +252,36 @@ function formatAccessExpiry(value) {
   });
 }
 
+function getAccessExpiryMs() {
+  if (!state.accessValidUntil) {
+    return 0;
+  }
+
+  const expiryMs = new Date(state.accessValidUntil).getTime();
+  return Number.isNaN(expiryMs) ? 0 : expiryMs;
+}
+
+function getRenewalAvailableAtMs() {
+  if (!state.accessActive) {
+    return 0;
+  }
+
+  const expiryMs = getAccessExpiryMs();
+  if (!expiryMs) {
+    return 0;
+  }
+
+  return expiryMs - accessWindowHours * 60 * 60 * 1000;
+}
+
+function hasReachedAccessExtensionLimit() {
+  if (!state.accessActive) {
+    return false;
+  }
+
+  return getRenewalAvailableAtMs() > Date.now() + 1000;
+}
+
 function updateAccessUI() {
   const { accessPanel, accessStatus, payAccessButton, refreshAccessButton } = overlayRefs();
   if (!accessPanel || !accessStatus || !payAccessButton || !refreshAccessButton) {
@@ -263,15 +296,23 @@ function updateAccessUI() {
 
   accessPanel.classList.remove("hidden");
   const expiryText = formatAccessExpiry(state.accessValidUntil);
+  const renewalAvailableText = formatAccessExpiry(new Date(getRenewalAvailableAtMs()).toISOString());
   accessStatus.textContent = state.accessActive
-    ? `${state.racerName}, your paid pass is active until ${expiryText}.`
+    ? hasReachedAccessExtensionLimit()
+      ? `${state.racerName}, your pass is active until ${expiryText}. You can renew again after ${renewalAvailableText}.`
+      : `${state.racerName}, your paid pass is active until ${expiryText}.`
     : expiryText
       ? `${state.racerName}, your last pass expired. Pay Rs.1 to reactivate until 24 hours from payment.`
       : `${state.racerName}, pay Rs.1 to unlock 24 hours of signed-in play. Your scores and profile stay saved either way.`;
 
   payAccessButton.disabled = state.accessBusy;
   refreshAccessButton.disabled = state.accessBusy;
-  payAccessButton.textContent = state.accessActive ? "Extend Another 24 Hours" : "Pay Rs.1 for 24 Hours";
+  if (hasReachedAccessExtensionLimit()) {
+    payAccessButton.disabled = true;
+    payAccessButton.textContent = "Renew Later";
+  } else {
+    payAccessButton.textContent = state.accessActive ? "Extend Another 24 Hours" : "Pay Rs.1 for 24 Hours";
+  }
   startButton.disabled = Boolean(state.user && !state.accessActive);
 }
 
@@ -645,6 +686,13 @@ async function openPaidAccessCheckout() {
     return;
   }
 
+  if (hasReachedAccessExtensionLimit()) {
+    const renewalAvailableText = formatAccessExpiry(new Date(getRenewalAvailableAtMs()).toISOString());
+    updateCloudStatus(`Your pass is already stacked ahead. You can renew again after ${renewalAvailableText}.`, false);
+    updateAccessUI();
+    return;
+  }
+
   if (typeof window.Razorpay !== "function") {
     updateCloudStatus("The payment gate is not ready yet. Reload and try again.", false);
     return;
@@ -673,6 +721,7 @@ async function openPaidAccessCheckout() {
       description: "24-hour play access",
       order_id: data.orderId,
       handler: async (response) => {
+        state.pendingPaymentOrderId = "";
         try {
           const { error: verifyError } = await supabaseClient.functions.invoke("verify-payment", {
             body: {
@@ -707,7 +756,19 @@ async function openPaidAccessCheckout() {
         color: "#ffd166",
       },
       modal: {
-        ondismiss: () => {
+        ondismiss: async () => {
+          if (state.pendingPaymentOrderId) {
+            try {
+              await supabaseClient.functions.invoke("cancel-payment-order", {
+                body: {
+                  razorpay_order_id: state.pendingPaymentOrderId,
+                },
+              });
+            } catch (cancelError) {
+              console.error("Razorpay cancel tracking error:", cancelError);
+            }
+            state.pendingPaymentOrderId = "";
+          }
           state.accessBusy = false;
           updateAccessUI();
           updateCloudStatus("Payment window closed. Your pass has not changed.", true);
@@ -715,8 +776,10 @@ async function openPaidAccessCheckout() {
       },
     });
 
+    state.pendingPaymentOrderId = data.orderId;
     checkout.open();
   } catch (error) {
+    state.pendingPaymentOrderId = "";
     updateCloudStatus(
       await readFunctionErrorMessage(
         error,

@@ -67,13 +67,6 @@
             <h2>Choose Your Vehicle</h2>
             <p id="sessionModeText">Racer ready. Best score is tracked for this session.</p>
             <p id="cloudStatus" class="cloud-status">Checking your game progress...</p>
-            <div id="accessPanel" class="access-panel hidden">
-              <p id="accessStatus" class="access-status">Checking your 24-hour pass...</p>
-              <div class="auth-actions compact">
-                <button id="payAccessButton" class="auth-button primary" type="button">Pay Rs.1 for 24 Hours</button>
-                <button id="refreshAccessButton" class="auth-button secondary" type="button">Check My Pass</button>
-              </div>
-            </div>
             <div class="profile-panel">
               <label class="field profile-field">
                 <span>Profile Racer Name</span>
@@ -132,9 +125,16 @@
             </div>
 
             <p>Use Left and Right to dodge, Down to remove one boost level.</p>
+            <div id="accessPanel" class="access-panel hidden">
+              <p id="accessStatus" class="access-status">Checking your 24-hour pass...</p>
+              <div class="auth-actions compact">
+                <button id="payAccessButton" class="auth-button primary" type="button">Pay Rs.1 for 24 Hours</button>
+                <button id="refreshAccessButton" class="auth-button secondary" type="button">Check My Pass</button>
+              </div>
+            </div>
             <div class="account-secondary-actions">
-              <button id="deleteProfileButton" class="auth-button danger delete-profile-button" type="button">Delete Account</button>
               <button id="feedbackToggleButton" class="auth-button tertiary feedback-toggle-button" type="button">Feedback Survey</button>
+              <button id="deleteProfileButton" class="auth-button danger delete-profile-button" type="button">Delete Account</button>
             </div>
             <div id="feedbackPanel" class="feedback-panel hidden">
               <p class="feedback-intro">Tell us how the ride felt and what would make Viral Racing Game even better.</p>

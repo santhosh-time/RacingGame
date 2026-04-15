@@ -30,6 +30,7 @@ alter table public.profiles add column if not exists updated_at timestamptz not 
 create table if not exists public.access_passes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
+  racer_name text not null default 'Road Rider',
   payment_status text not null default 'pending',
   amount_paise integer not null default 100,
   currency text not null default 'INR',
@@ -42,6 +43,7 @@ create table if not exists public.access_passes (
 );
 
 alter table public.access_passes add column if not exists user_id uuid;
+alter table public.access_passes add column if not exists racer_name text not null default 'Road Rider';
 alter table public.access_passes add column if not exists payment_status text not null default 'pending';
 alter table public.access_passes add column if not exists amount_paise integer not null default 100;
 alter table public.access_passes add column if not exists currency text not null default 'INR';
@@ -52,6 +54,34 @@ alter table public.access_passes add column if not exists valid_until timestampt
 alter table public.access_passes add column if not exists activated_at timestamptz;
 alter table public.access_passes add column if not exists created_at timestamptz not null default timezone('utc', now());
 create unique index if not exists access_passes_user_id_key on public.access_passes (user_id);
+
+create table if not exists public.access_pass_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  racer_name text not null,
+  amount_paise integer not null default 100,
+  currency text not null default 'INR',
+  transaction_status text not null default 'pending',
+  provider_order_id text,
+  provider_payment_id text,
+  provider_signature text,
+  failure_reason text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.access_pass_transactions add column if not exists user_id uuid;
+alter table public.access_pass_transactions add column if not exists racer_name text not null default 'Road Rider';
+alter table public.access_pass_transactions add column if not exists amount_paise integer not null default 100;
+alter table public.access_pass_transactions add column if not exists currency text not null default 'INR';
+alter table public.access_pass_transactions add column if not exists transaction_status text not null default 'pending';
+alter table public.access_pass_transactions add column if not exists provider_order_id text;
+alter table public.access_pass_transactions add column if not exists provider_payment_id text;
+alter table public.access_pass_transactions add column if not exists provider_signature text;
+alter table public.access_pass_transactions add column if not exists failure_reason text;
+alter table public.access_pass_transactions add column if not exists created_at timestamptz not null default timezone('utc', now());
+alter table public.access_pass_transactions add column if not exists updated_at timestamptz not null default timezone('utc', now());
+create unique index if not exists access_pass_transactions_provider_order_key on public.access_pass_transactions (provider_order_id) where provider_order_id is not null;
 
 create table if not exists public.feedback_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -80,11 +110,13 @@ alter table public.feedback_submissions add constraint feedback_submissions_rati
 
 alter table public.profiles enable row level security;
 alter table public.access_passes enable row level security;
+alter table public.access_pass_transactions enable row level security;
 alter table public.feedback_submissions enable row level security;
 
 grant usage on schema public to authenticated;
 grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update on public.access_passes to authenticated;
+grant select on public.access_pass_transactions to authenticated;
 
 drop policy if exists "users manage own profile" on public.profiles;
 drop policy if exists "users read own profile" on public.profiles;
@@ -131,9 +163,22 @@ to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "users read own access pass transactions" on public.access_pass_transactions;
+create policy "users read own access pass transactions"
+on public.access_pass_transactions
+for select
+to authenticated
+using (auth.uid() = user_id);
+
 drop trigger if exists profiles_touch_updated_at on public.profiles;
+drop trigger if exists access_pass_transactions_touch_updated_at on public.access_pass_transactions;
 
 create trigger profiles_touch_updated_at
 before update on public.profiles
+for each row
+execute function public.touch_updated_at();
+
+create trigger access_pass_transactions_touch_updated_at
+before update on public.access_pass_transactions
 for each row
 execute function public.touch_updated_at();

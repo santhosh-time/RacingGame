@@ -70,7 +70,11 @@ Deno.serve(async (request) => {
 
   const currentExpiryMs = existingPass?.valid_until ? new Date(existingPass.valid_until).getTime() : 0;
   const baseTimeMs = Math.max(Date.now(), Number.isNaN(currentExpiryMs) ? 0 : currentExpiryMs);
-  const validUntil = new Date(baseTimeMs + 24 * 60 * 60 * 1000).toISOString();
+  const maxAllowedExpiryMs = Date.now() + 48 * 60 * 60 * 1000;
+  if (!Number.isNaN(currentExpiryMs) && currentExpiryMs >= maxAllowedExpiryMs - 1000) {
+    return jsonResponse({ error: "Your pass is already extended to the 48-hour limit." }, 400);
+  }
+  const validUntil = new Date(Math.min(baseTimeMs + 24 * 60 * 60 * 1000, maxAllowedExpiryMs)).toISOString();
   const activatedAt = new Date().toISOString();
 
   const accessPassPayload = {
@@ -107,6 +111,20 @@ Deno.serve(async (request) => {
 
   if (updateError) {
     return jsonResponse({ error: `Could not activate the access pass: ${updateError.message}` }, 500);
+  }
+
+  const { error: transactionUpdateError } = await adminClient
+    .from("access_pass_transactions")
+    .update({
+      transaction_status: "paid",
+      provider_payment_id: paymentId,
+      provider_signature: signature,
+      failure_reason: null,
+    })
+    .eq("provider_order_id", orderId);
+
+  if (transactionUpdateError) {
+    return jsonResponse({ error: `Could not record the payment success: ${transactionUpdateError.message}` }, 500);
   }
 
   return jsonResponse({
