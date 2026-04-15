@@ -29,6 +29,18 @@
         <p class="label">Speed</p>
         <h1 id="speedDisplay">96 km/h</h1>
       </div>
+      <div class="stat-card compact-stat">
+        <p class="label">Level</p>
+        <h1 id="levelDisplay">1</h1>
+      </div>
+      <div class="stat-card compact-stat">
+        <p class="label">Lives</p>
+        <h1 id="livesDisplay">0</h1>
+      </div>
+      <div id="fuelCard" class="stat-card compact-stat hidden">
+        <p class="label">Fuel</p>
+        <h1 id="fuelDisplay">100%</h1>
+      </div>
       <div class="hud-actions">
         <button id="soundButton" class="sound-button" type="button">Sound: On</button>
         <button id="startButton" class="start-button" type="button">Start Game</button>
@@ -43,6 +55,16 @@
         <div class="road-line line-4"></div>
 
         <div id="playerCar" class="vehicle player-vehicle car-sport"></div>
+        <div id="laserPointer" class="laser-pointer hidden"></div>
+
+        <div id="welcomeModal" class="welcome-modal">
+          <div class="welcome-card">
+            <p class="welcome-eyebrow">Welcome To</p>
+            <h2>The Viral Alien Games</h2>
+            <p>Start your ride, choose your racer, and jump into the garage.</p>
+            <button id="welcomeStartButton" class="auth-button primary welcome-start-button" type="button">ENTER</button>
+          </div>
+        </div>
 
         <div id="message" class="message">
           <div id="racerGate" class="auth-gate">
@@ -60,13 +82,20 @@
               </label>
               <label class="field">
                 <span>Racer Name</span>
-                <input id="authRacerNameInput" type="text" maxlength="18" placeholder="Guest Player" autocomplete="nickname">
+                <input id="authRacerNameInput" type="text" maxlength="18" placeholder="Guest Racer" autocomplete="nickname">
               </label>
               <div class="auth-actions">
                 <button id="signInButton" class="auth-button secondary" type="button">Sign In</button>
                 <button id="signUpButton" class="auth-button primary" type="button">Sign Up</button>
               </div>
               <button id="guestButton" class="auth-button tertiary" type="button">Play As Guest</button>
+              <div id="guestUnlockPanel" class="guest-unlock-panel hidden">
+                <label class="field">
+                  <span>Guest Unlock Code</span>
+                  <input id="guestUnlockInput" type="text" maxlength="24" placeholder="Enter coupon code" autocomplete="off">
+                </label>
+                <button id="guestUnlockButton" class="auth-button primary" type="button">Unlock Guest Mode</button>
+              </div>
               <p id="authStatus" class="auth-status">Sign in to save your progress. Guest mode keeps scores only on this device.</p>
             </form>
           </div>
@@ -78,7 +107,7 @@
             <div class="profile-panel">
               <label class="field profile-field">
                 <span>Profile Racer Name</span>
-                <input id="profileNameInput" type="text" maxlength="18" placeholder="Guest Player" autocomplete="nickname">
+                <input id="profileNameInput" type="text" maxlength="18" placeholder="Guest Racer" autocomplete="nickname">
               </label>
               <div class="auth-actions compact">
                 <button id="saveProfileButton" class="auth-button primary" type="button">Save Name</button>

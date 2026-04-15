@@ -3,9 +3,16 @@ const playerCar = document.getElementById("playerCar");
 const scoreDisplay = document.getElementById("score");
 const bestScoreDisplay = document.getElementById("bestScore");
 const speedDisplay = document.getElementById("speedDisplay");
+const levelDisplay = document.getElementById("levelDisplay");
+const livesDisplay = document.getElementById("livesDisplay");
+const fuelCard = document.getElementById("fuelCard");
+const fuelDisplay = document.getElementById("fuelDisplay");
 const soundButton = document.getElementById("soundButton");
 const startButton = document.getElementById("startButton");
 const message = document.getElementById("message");
+const welcomeModal = document.getElementById("welcomeModal");
+const welcomeStartButton = document.getElementById("welcomeStartButton");
+const laserPointer = document.getElementById("laserPointer");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
@@ -54,14 +61,25 @@ const boosterSafetyDistance = 170;
 const boosterWidth = 38;
 const guestRunLimit = 3;
 const guestRunsStorageKey = "viral-racing-guest-runs";
+const guestUnlimitedSessionKey = "viral-racing-guest-unlimited";
+const guestUnlimitedCouponCode = "urinfinity";
 const accessWindowHours = 24;
 const maxAccessHours = 48;
+const levelOneBaseSpeed = 4.8;
+const levelTwoBaseSpeed = Number((levelOneBaseSpeed * 1.2).toFixed(2));
+const levelThreeTargetBaseSpeed = Number((levelOneBaseSpeed * 2).toFixed(2));
+const levelThreeStartSpeed = levelTwoBaseSpeed;
+const laserDurationMs = 5000;
+const laserSpeedMultiplier = 1.5;
+const fuelDrainStep = 10;
+const fuelPickupRestore = 10;
 
 const state = {
   active: false,
   score: 0,
-  baseSpeed: 4.8,
-  currentSpeed: 4.8,
+  baseSpeed: levelOneBaseSpeed,
+  baseSpeedTarget: levelOneBaseSpeed,
+  currentSpeed: levelOneBaseSpeed,
   boostLevel: 0,
   selectedVehicle: "bike-street",
   playerX: 0,
@@ -71,7 +89,6 @@ const state = {
     ArrowDown: false,
   },
   enemies: [],
-  booster: null,
   nextBoosterScore: 1000,
   animationId: 0,
   soundEnabled: true,
@@ -82,6 +99,23 @@ const state = {
   racerName: "Guest Racer",
   bestScore: 0,
   bestScoreVehicle: "bike-street",
+  level: 1,
+  livesRemaining: 0,
+  pickup: null,
+  pickupType: "",
+  nextLevelScore: 8000,
+  nextLaserScore: 1000,
+  nextFuelScore: 8700,
+  nextFuelDrainScore: 9000,
+  laserActiveUntil: 0,
+  invincibleUntil: 0,
+  pointer: {
+    x: 210,
+    y: 320,
+  },
+  fuelPercent: 100,
+  countdownRunning: false,
+  pendingTransition: false,
   accessActive: false,
   accessValidUntil: "",
   accessBusy: false,
@@ -104,6 +138,59 @@ function syncGameBounds() {
 
 function updateBestScoreDisplay() {
   bestScoreDisplay.textContent = String(state.bestScore);
+}
+
+function updateLevelDisplay() {
+  if (levelDisplay) {
+    levelDisplay.textContent = String(state.level);
+  }
+}
+
+function getLivesForLevel(levelNumber = state.level) {
+  if (levelNumber >= 3) {
+    return 2;
+  }
+  if (levelNumber === 2) {
+    return 1;
+  }
+  return 0;
+}
+
+function updateLivesDisplay() {
+  if (livesDisplay) {
+    livesDisplay.textContent = String(Math.max(0, state.livesRemaining));
+  }
+}
+
+function updateFuelDisplay() {
+  if (!fuelCard || !fuelDisplay) {
+    return;
+  }
+
+  const showFuel = state.level >= 3;
+  fuelCard.classList.toggle("hidden", !showFuel);
+  if (showFuel) {
+    fuelDisplay.textContent = `${Math.max(0, Math.round(state.fuelPercent))}%`;
+  }
+}
+
+function applyLevelTheme() {
+  const levelClass = `level-${state.level}`;
+  document.body.classList.remove("level-1", "level-2", "level-3");
+  gameArea.classList.remove("level-1", "level-2", "level-3");
+  document.body.classList.add(levelClass);
+  gameArea.classList.add(levelClass);
+}
+
+function updatePlayerInvincibility() {
+  const invincible = Date.now() < state.invincibleUntil;
+  playerCar.classList.toggle("is-invincible", invincible);
+}
+
+function getCurrentKmph() {
+  const metersPerPixel = roadWidthMeters / gameBounds.width;
+  const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
+  return Math.round(metersPerSecond * 3.6);
 }
 
 function overlayRefs() {
@@ -136,8 +223,33 @@ function overlayRefs() {
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
+    guestUnlockPanel: document.getElementById("guestUnlockPanel"),
+    guestUnlockInput: document.getElementById("guestUnlockInput"),
+    guestUnlockButton: document.getElementById("guestUnlockButton"),
     vehicleOptions: Array.from(document.querySelectorAll(".vehicle-option")),
   };
+}
+
+function dismissWelcomeModal() {
+  welcomeModal?.classList.add("hidden");
+}
+
+function triggerWelcomeStart() {
+  if (welcomeModal?.classList.contains("hidden")) {
+    return;
+  }
+
+  dismissWelcomeModal();
+  const { authEmailInput, signInButton, guestButton } = overlayRefs();
+  window.setTimeout(() => {
+    authEmailInput?.focus();
+    if (!authEmailInput && !state.user) {
+      signInButton?.focus();
+    }
+    if (!state.user && !signInButton) {
+      guestButton?.focus();
+    }
+  }, 120);
 }
 
 function bindElementOnce(element, bindingKey, eventName, handler) {
@@ -189,7 +301,30 @@ function getGuestRunsRemaining() {
   return Math.max(0, guestRunLimit - getGuestRunsUsed());
 }
 
+function hasUnlimitedGuestAccess() {
+  try {
+    return window.sessionStorage.getItem(guestUnlimitedSessionKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setUnlimitedGuestAccess(enabled) {
+  try {
+    if (enabled) {
+      window.sessionStorage.setItem(guestUnlimitedSessionKey, "true");
+    } else {
+      window.sessionStorage.removeItem(guestUnlimitedSessionKey);
+    }
+  } catch {
+    // Ignore session storage failures and keep the default guest rule in place.
+  }
+}
+
 function isGuestLimitReached() {
+  if (hasUnlimitedGuestAccess()) {
+    return false;
+  }
   return getGuestRunsRemaining() <= 0;
 }
 
@@ -224,8 +359,21 @@ function updateAuthStatus(messageText, isReady = false) {
 }
 
 function updateGuestAccessUI() {
-  const { guestButton, authStatus } = overlayRefs();
+  const { guestButton, guestUnlockPanel, guestUnlockInput, authStatus } = overlayRefs();
   if (!guestButton) {
+    return;
+  }
+
+  if (hasUnlimitedGuestAccess()) {
+    guestButton.disabled = false;
+    guestButton.textContent = "Play As Guest (Unlimited)";
+    guestUnlockPanel?.classList.add("hidden");
+    if (guestUnlockInput) {
+      guestUnlockInput.value = "";
+    }
+    if (!state.user && authStatus) {
+      updateAuthStatus("Unlimited guest mode is unlocked for this browser session. Keep racing.", true);
+    }
     return;
   }
 
@@ -234,10 +382,31 @@ function updateGuestAccessUI() {
   guestButton.textContent = remaining <= 0
     ? "Guest Mode Over"
     : `Play As Guest (${remaining} Left)`;
+  guestUnlockPanel?.classList.toggle("hidden", remaining > 0);
 
   if (!state.user && remaining <= 0 && authStatus) {
-    updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+    updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
   }
+}
+
+function unlockUnlimitedGuestMode() {
+  const { guestUnlockInput } = overlayRefs();
+  const enteredCode = guestUnlockInput?.value?.trim().toLowerCase() || "";
+
+  if (!enteredCode) {
+    updateAuthStatus("Enter your guest unlock code to continue.", false);
+    return;
+  }
+
+  if (enteredCode !== guestUnlimitedCouponCode) {
+    updateAuthStatus("That guest unlock code did not match. Try again.", false);
+    return;
+  }
+
+  setUnlimitedGuestAccess(true);
+  updateGuestAccessUI();
+  updateCloudStatus("Unlimited guest mode is unlocked for this browser session.", true);
+  updateAuthStatus("Unlimited guest mode is unlocked. You can keep racing until this browser session ends.", true);
 }
 
 function updateFeedbackStatus(messageText, isReady = false) {
@@ -973,6 +1142,7 @@ function guideToPaidAccess() {
 
 function showVehicleSetup() {
   const { racerGate, vehicleSetup, authRacerNameInput } = overlayRefs();
+  message.classList.remove("game-over");
   racerGate.classList.add("hidden");
   vehicleSetup.classList.remove("hidden");
   if (authRacerNameInput) {
@@ -988,6 +1158,7 @@ function showVehicleSetup() {
 
 function showAuthGate() {
   const { racerGate, vehicleSetup } = overlayRefs();
+  message.classList.remove("game-over");
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
   updateAccessUI();
@@ -998,7 +1169,7 @@ function showAuthGate() {
 function startGuestMode(name = "") {
   if (isGuestLimitReached()) {
     showAuthGate();
-    updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+    updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
     updateGuestAccessUI();
     return;
   }
@@ -1013,8 +1184,13 @@ function startGuestMode(name = "") {
   updateSessionModeText();
   updateProfileInputs();
   updateAccessUI();
-  updateCloudStatus(`Guest mode is ready. ${getGuestRunsRemaining()} guest tries are left on this device.`, true);
-  updateAuthStatus("Guest mode is ready. You can sign in later whenever you want.", true);
+  if (hasUnlimitedGuestAccess()) {
+    updateCloudStatus("Unlimited guest mode is ready for this browser session.", true);
+    updateAuthStatus("Unlimited guest mode is ready. You can sign in later whenever you want.", true);
+  } else {
+    updateCloudStatus(`Guest mode is ready. ${getGuestRunsRemaining()} guest tries are left on this device.`, true);
+    updateAuthStatus("Guest mode is ready. You can sign in later whenever you want.", true);
+  }
   showVehicleSetup();
 }
 
@@ -1052,22 +1228,38 @@ function resetSessionForNewGame() {
   cancelAnimationFrame(state.animationId);
   clearBooster();
   state.score = 0;
+  state.level = 1;
+  state.livesRemaining = 0;
   state.bestScore = 0;
   state.boostLevel = 0;
-  state.baseSpeed = 4.8;
-  state.currentSpeed = 4.8;
+  state.baseSpeed = levelOneBaseSpeed;
+  state.baseSpeedTarget = levelOneBaseSpeed;
+  state.currentSpeed = levelOneBaseSpeed;
   state.enemyRespawns = 0;
   state.nextBoosterScore = 1000;
+  state.nextLaserScore = 2000;
+  state.nextFuelScore = 8700;
+  state.nextFuelDrainScore = 9000;
+  state.laserActiveUntil = 0;
+  state.invincibleUntil = 0;
+  state.fuelPercent = 100;
+  state.pendingTransition = false;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
   updateBestScoreDisplay();
+  updateLevelDisplay();
+  updateLivesDisplay();
+  updateFuelDisplay();
+  applyLevelTheme();
   refreshSpeed();
   resetEnemies();
   playerCar.style.left = `${state.playerX}px`;
   roadLines.forEach((line, index) => {
     line.style.top = `${20 + index * 160}px`;
+    line.style.left = "50%";
   });
   message.innerHTML = initialMessageMarkup;
+  message.classList.remove("game-over");
   bindOverlayControls();
   showVehicleSetup();
   updateAuthStatus(`Choose a vehicle for ${state.racerName}. Best score has been reset.`, true);
@@ -1086,6 +1278,8 @@ function bindOverlayControls() {
     signInButton,
     signUpButton,
     guestButton,
+    guestUnlockInput,
+    guestUnlockButton,
     saveProfileButton,
     signOutButton,
     deleteProfileButton,
@@ -1178,6 +1372,19 @@ function bindOverlayControls() {
     });
   }
 
+  if (guestUnlockButton) {
+    bindElementOnce(guestUnlockButton, "GuestUnlockClick", "click", unlockUnlimitedGuestMode);
+  }
+
+  if (guestUnlockInput) {
+    bindElementOnce(guestUnlockInput, "GuestUnlockEnter", "keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        unlockUnlimitedGuestMode();
+      }
+    });
+  }
+
   if (saveProfileButton) {
     bindElementOnce(saveProfileButton, "SaveProfileClick", "click", saveProfileName);
   }
@@ -1228,6 +1435,10 @@ function bindOverlayControls() {
       await supabaseClient.auth.signOut();
       updateAuthStatus("You have signed out. You can sign in again or play as a guest.", true);
     });
+  }
+
+  if (welcomeStartButton) {
+    bindElementOnce(welcomeStartButton, "WelcomeStartClick", "click", triggerWelcomeStart);
   }
 }
 
@@ -1680,11 +1891,13 @@ function vehicleWidth() {
 }
 
 function refreshSpeed() {
-  const metersPerPixel = roadWidthMeters / gameBounds.width;
-  state.currentSpeed = state.baseSpeed * (boostMultiplier ** state.boostLevel);
-  const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
-  const kmph = Math.round(metersPerSecond * 3.6);
-  speedDisplay.textContent = `${kmph} km/h`;
+  const laserMultiplier = Date.now() < state.laserActiveUntil ? laserSpeedMultiplier : 1;
+  const levelOneBoostMultiplier = state.level === 1 ? boostMultiplier ** state.boostLevel : 1;
+  state.currentSpeed = state.baseSpeed * levelOneBoostMultiplier * laserMultiplier;
+  speedDisplay.textContent = `${getCurrentKmph()} km/h`;
+  updateLevelDisplay();
+  updateLivesDisplay();
+  updateFuelDisplay();
 }
 
 function roadPadding() {
@@ -1844,44 +2057,77 @@ function resetEnemies() {
   ];
 }
 
-function createBooster(y) {
-  const booster = document.createElement("div");
-  booster.className = "booster";
+function createPickup(y, pickupType) {
+  const pickup = document.createElement("div");
+  pickup.className = `pickup pickup-${pickupType}`;
+  pickup.dataset.type = pickupType;
   const left = safeBoosterX();
-  booster.style.top = `${y}px`;
-  booster.style.left = `${left}px`;
-  gameArea.appendChild(booster);
-  return booster;
+  pickup.style.top = `${y}px`;
+  pickup.style.left = `${left}px`;
+  gameArea.appendChild(pickup);
+  return pickup;
 }
 
 function clearBooster() {
-  if (state.booster) {
-    state.booster.remove();
-    state.booster = null;
+  if (state.pickup) {
+    state.pickup.remove();
+    state.pickup = null;
+    state.pickupType = "";
   }
 }
 
 function spawnBooster() {
-  if (state.booster || state.score < state.nextBoosterScore) {
+  if (state.pickup) {
     return;
   }
-  state.booster = createBooster(boosterSpawnTop);
-  state.nextBoosterScore += 1000;
+
+  if (state.level === 1) {
+    if (state.score >= state.nextBoosterScore) {
+      state.pickupType = "booster";
+      state.pickup = createPickup(boosterSpawnTop, "booster");
+      state.nextBoosterScore += 1000;
+    }
+    return;
+  }
+
+  if (state.level === 2) {
+    if (state.score >= state.nextLaserScore) {
+      state.pickupType = "laser";
+      state.pickup = createPickup(boosterSpawnTop, "laser");
+      state.nextLaserScore += 1000;
+    }
+    return;
+  }
+
+  if (state.level >= 3) {
+    if (state.score >= state.nextFuelScore) {
+      state.pickupType = "fuel";
+      state.pickup = createPickup(boosterSpawnTop, "fuel");
+      state.nextFuelScore += 700;
+      return;
+    }
+
+    if (state.score >= state.nextLaserScore) {
+      state.pickupType = "laser";
+      state.pickup = createPickup(boosterSpawnTop, "laser");
+      state.nextLaserScore += 1000;
+    }
+  }
 }
 
 function updateBoosterLaneSafety() {
-  if (!state.booster) {
+  if (!state.pickup) {
     return;
   }
 
-  const currentLeft = parseFloat(state.booster.style.left);
-  const currentTop = parseFloat(state.booster.style.top);
+  const currentLeft = parseFloat(state.pickup.style.left);
+  const currentTop = parseFloat(state.pickup.style.top);
   const nearCollectionZone = currentTop > 80 && currentTop < boosterCollectionZoneTop + 60;
 
   if (nearCollectionZone && !boosterIsSafeAt(currentLeft)) {
     const fallbackLeft = safeBoosterX();
     if (Math.abs(fallbackLeft - currentLeft) > 8) {
-      state.booster.style.left = `${fallbackLeft}px`;
+      state.pickup.style.left = `${fallbackLeft}px`;
     }
   }
 }
@@ -1897,6 +2143,142 @@ function removeBoostLevel() {
   refreshSpeed();
 }
 
+function updateSpeedRamp() {
+  const difference = state.baseSpeedTarget - state.baseSpeed;
+  if (Math.abs(difference) < 0.02) {
+    state.baseSpeed = state.baseSpeedTarget;
+    return;
+  }
+
+  const rampFactor = state.level === 3 ? 0.012 : 0.03;
+  state.baseSpeed += difference * rampFactor;
+}
+
+function updatePointerPosition(clientX, clientY) {
+  if (!laserPointer) {
+    return;
+  }
+
+  const rect = gameArea.getBoundingClientRect();
+  state.pointer.x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  state.pointer.y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+  laserPointer.style.left = `${state.pointer.x}px`;
+  laserPointer.style.top = `${state.pointer.y}px`;
+}
+
+function updateLaserPointer() {
+  if (!laserPointer) {
+    return;
+  }
+
+  const laserActive = Date.now() < state.laserActiveUntil;
+  laserPointer.classList.toggle("hidden", !laserActive);
+}
+
+function activateLaserMode() {
+  state.laserActiveUntil = Date.now() + laserDurationMs;
+  playBoosterSound();
+  updateLaserPointer();
+  refreshSpeed();
+}
+
+function increaseFuel(amount) {
+  state.fuelPercent = Math.min(100, state.fuelPercent + amount);
+  updateFuelDisplay();
+}
+
+function handleFuelDrain() {
+  if (state.level < 3) {
+    return;
+  }
+
+  while (state.score >= state.nextFuelDrainScore) {
+    state.fuelPercent = Math.max(0, state.fuelPercent - fuelDrainStep);
+    state.nextFuelDrainScore += 1000;
+  }
+
+  if (state.fuelPercent <= 0) {
+    endGame("Out of fuel!");
+  }
+
+  updateFuelDisplay();
+}
+
+async function showCountdownOverlay(title, subtitle = "") {
+  state.countdownRunning = true;
+  const countdownValues = [3, 2, 1];
+  for (const count of countdownValues) {
+    message.innerHTML = `
+      <div class="countdown-panel">
+        <p class="countdown-eyebrow">${title}</p>
+        <h2>${count}</h2>
+        <p>${subtitle}</p>
+      </div>
+    `;
+    message.classList.remove("hidden");
+    syncVehiclePreviewVisibility();
+    await new Promise((resolve) => window.setTimeout(resolve, 800));
+  }
+
+  message.classList.add("hidden");
+  syncVehiclePreviewVisibility();
+  state.countdownRunning = false;
+}
+
+async function beginLevel(levelNumber) {
+  state.pendingTransition = true;
+  state.active = false;
+  cancelAnimationFrame(state.animationId);
+  stopEngineSound();
+
+  const title = levelNumber === 1 ? "Level 1 Starts" : `Entering Level ${levelNumber}`;
+  const subtitle = levelNumber === 1
+    ? "Get ready to build speed."
+    : levelNumber === 2
+      ? "Muddy roads ahead. Laser mode incoming."
+      : "Skyline sprint. Watch your fuel.";
+
+  await showCountdownOverlay(title, subtitle);
+
+  state.level = levelNumber;
+  state.livesRemaining = getLivesForLevel(levelNumber);
+  updateLevelDisplay();
+  updateLivesDisplay();
+  applyLevelTheme();
+
+  if (levelNumber === 1) {
+    state.baseSpeed = 2.6;
+    state.baseSpeedTarget = levelOneBaseSpeed;
+    state.boostLevel = 0;
+    state.nextBoosterScore = Math.max(1000, state.score + 1000);
+    state.nextLaserScore = 1000;
+    state.nextFuelScore = 8700;
+    state.nextFuelDrainScore = 9000;
+    state.fuelPercent = 100;
+  } else if (levelNumber === 2) {
+    state.baseSpeed = levelTwoBaseSpeed;
+    state.baseSpeedTarget = levelTwoBaseSpeed;
+    state.boostLevel = 0;
+    state.nextLaserScore = Math.max(state.score + 1000, 2000);
+    state.nextLevelScore = 20000;
+    clearBooster();
+  } else {
+    state.baseSpeed = Math.max(state.baseSpeed, levelThreeStartSpeed);
+    state.baseSpeedTarget = levelThreeTargetBaseSpeed;
+    state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
+    state.nextFuelScore = Math.max(state.score + 700, 8700);
+    state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
+    state.fuelPercent = 100;
+  }
+
+  refreshSpeed();
+  await primeMobileAudio();
+  await startEngineSound();
+  state.active = true;
+  state.pendingTransition = false;
+  gameLoop();
+}
+
 function setControlState(controlName, pressed) {
   if (controlName in state.keys) {
     state.keys[controlName] = pressed;
@@ -1904,13 +2286,20 @@ function setControlState(controlName, pressed) {
 }
 
 function updateRoadLines() {
-  roadLines.forEach((line) => {
+  roadLines.forEach((line, index) => {
     const currentTop = parseFloat(line.style.top || line.offsetTop);
     let nextTop = currentTop + state.currentSpeed;
     if (nextTop > gameBounds.height) {
       nextTop = -100;
     }
     line.style.top = `${nextTop}px`;
+
+    if (state.level >= 3) {
+      const curveOffset = Math.sin((nextTop + index * 90 + state.score * 0.08) / 65) * 36;
+      line.style.left = `calc(50% + ${curveOffset}px)`;
+    } else {
+      line.style.left = "50%";
+    }
   });
 }
 
@@ -1924,6 +2313,32 @@ function updatePlayer() {
 
   state.playerX = clampVehicleLeft(state.playerX, vehicleWidth());
   playerCar.style.left = `${state.playerX}px`;
+}
+
+function handleVehicleCrash() {
+  if (Date.now() < state.invincibleUntil) {
+    return;
+  }
+
+  if (state.livesRemaining > 0) {
+    state.livesRemaining -= 1;
+    state.invincibleUntil = Date.now() + 1800;
+    state.playerX = middleLaneX();
+    playerCar.style.left = `${state.playerX}px`;
+    resetEnemies();
+    clearBooster();
+    updateLivesDisplay();
+    playCrashSound();
+    updateCloudStatus(
+      state.livesRemaining > 0
+        ? `${state.racerName}, lifeline used. ${state.livesRemaining} life remaining.`
+        : `${state.racerName}, lifeline used. No lives left now. Stay sharp.`,
+      false,
+    );
+    return;
+  }
+
+  endGame();
 }
 
 function isColliding(a, b) {
@@ -1955,6 +2370,7 @@ function isColliding(a, b) {
 }
 
 function updateEnemies() {
+  const laserActive = Date.now() < state.laserActiveUntil;
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
     const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
@@ -1987,21 +2403,47 @@ function updateEnemies() {
 
     enemy.style.top = `${nextTop}px`;
 
-    if (isColliding(playerCar, enemy)) {
-      endGame();
+    if (laserActive && laserPointer && !laserPointer.classList.contains("hidden")) {
+      const enemyRect = enemy.getBoundingClientRect();
+      const pointerRect = laserPointer.getBoundingClientRect();
+      const pointerInsideEnemy = !(
+        pointerRect.right < enemyRect.left ||
+        pointerRect.left > enemyRect.right ||
+        pointerRect.bottom < enemyRect.top ||
+        pointerRect.top > enemyRect.bottom
+      );
+
+      if (pointerInsideEnemy) {
+        nextTop = -220;
+        const nextLane = chooseEnemyX(
+          state.enemies.filter((item) => item !== enemy).map((item) => parseFloat(item.style.left)),
+          false
+        );
+        const nextVehicle = pickEnemyVehicle();
+        const nextWidth = enemyVehicleWidth(nextVehicle);
+        enemy.dataset.vehicle = nextVehicle;
+        enemy.className = `vehicle enemy-vehicle ${nextVehicle}`;
+        enemy.style.left = `${clampVehicleLeft(nextLane, nextWidth)}px`;
+        enemy.style.top = `${nextTop}px`;
+        continue;
+      }
+    }
+
+    if (Date.now() >= state.invincibleUntil && isColliding(playerCar, enemy)) {
+      handleVehicleCrash();
       return;
     }
   }
 }
 
 function updateBooster() {
-  if (!state.booster) {
+  if (!state.pickup) {
     return;
   }
 
   updateBoosterLaneSafety();
 
-  const top = parseFloat(state.booster.style.top);
+  const top = parseFloat(state.pickup.style.top);
   let nextTop = top + state.currentSpeed + 0.8;
 
   if (nextTop > gameBounds.height) {
@@ -2009,10 +2451,17 @@ function updateBooster() {
     return;
   }
 
-  state.booster.style.top = `${nextTop}px`;
+  state.pickup.style.top = `${nextTop}px`;
 
-  if (isColliding(playerCar, state.booster)) {
-    addBoostLevel();
+  if (isColliding(playerCar, state.pickup)) {
+    if (state.pickupType === "booster") {
+      addBoostLevel();
+    } else if (state.pickupType === "laser") {
+      activateLaserMode();
+    } else if (state.pickupType === "fuel") {
+      increaseFuel(fuelPickupRestore);
+      updateCloudStatus(`${state.racerName}, fuel restored by ${fuelPickupRestore}%.`, true);
+    }
     clearBooster();
   }
 }
@@ -2023,15 +2472,31 @@ function gameLoop() {
   }
 
   syncGameBounds();
+  updateSpeedRamp();
+  refreshSpeed();
   updateRoadLines();
   updatePlayer();
+  updatePlayerInvincibility();
   spawnBooster();
   updateEnemies();
   updateBooster();
+  updateLaserPointer();
   updateEngineSound();
 
   state.score += 1;
+  handleFuelDrain();
   scoreDisplay.textContent = String(state.score);
+
+  if (state.level === 1 && (getCurrentKmph() > 120 || state.score >= 8000) && !state.pendingTransition) {
+    beginLevel(2);
+    return;
+  }
+
+  if (state.level === 2 && state.score >= 20000 && !state.pendingTransition) {
+    beginLevel(3);
+    return;
+  }
+
   state.animationId = requestAnimationFrame(gameLoop);
 }
 
@@ -2045,68 +2510,91 @@ async function startGame() {
   if (!state.user) {
     if (isGuestLimitReached()) {
       showAuthGate();
-      updateCloudStatus("Guest mode is over on this device. Sign in to keep racing.", false);
-      updateAuthStatus("Guest mode is over on this device. Sign in to keep racing.", false);
+      updateCloudStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
+      updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
       updateGuestAccessUI();
       return;
     }
 
-    const usedRuns = consumeGuestRun();
-    const remainingRuns = Math.max(0, guestRunLimit - usedRuns);
-    updateCloudStatus(
-      remainingRuns > 0
-        ? `Guest mode is active. ${remainingRuns} guest tries are left on this device.`
-        : "Guest mode is over on this device after this run. Sign in to keep racing next time.",
-      remainingRuns > 0,
-    );
+    if (hasUnlimitedGuestAccess()) {
+      updateCloudStatus("Unlimited guest mode is active for this browser session.", true);
+    } else {
+      const usedRuns = consumeGuestRun();
+      const remainingRuns = Math.max(0, guestRunLimit - usedRuns);
+      updateCloudStatus(
+        remainingRuns > 0
+          ? `Guest mode is active. ${remainingRuns} guest tries are left on this device.`
+          : "Guest mode is over on this device after this run. Sign in or unlock unlimited guest mode next time.",
+        remainingRuns > 0,
+      );
+    }
     updateGuestAccessUI();
   }
 
   cancelAnimationFrame(state.animationId);
   syncGameBounds();
   await primeMobileAudio();
-  await startEngineSound();
-  state.active = true;
   state.score = 0;
-  state.baseSpeed = 4.8;
-  state.currentSpeed = 4.8;
+  state.level = 1;
+  state.livesRemaining = 0;
+  state.baseSpeed = levelOneBaseSpeed;
+  state.baseSpeedTarget = levelOneBaseSpeed;
+  state.currentSpeed = levelOneBaseSpeed;
   state.boostLevel = 0;
   state.playerX = middleLaneX();
   state.nextBoosterScore = 1000;
+  state.nextLaserScore = 2000;
+  state.nextFuelScore = 8700;
+  state.nextFuelDrainScore = 9000;
+  state.laserActiveUntil = 0;
+  state.invincibleUntil = 0;
+  state.fuelPercent = 100;
+  state.pendingTransition = false;
   state.enemyRespawns = 0;
 
   roadLines.forEach((line, index) => {
     line.style.top = `${20 + index * 160}px`;
+    line.style.left = "50%";
   });
 
   resetEnemies();
   clearBooster();
+  state.pickupType = "";
   playerCar.style.left = `${state.playerX}px`;
   scoreDisplay.textContent = "0";
+  updateLevelDisplay();
+  updateLivesDisplay();
+  updateFuelDisplay();
+  applyLevelTheme();
   refreshSpeed();
+  updateLaserPointer();
   message.classList.add("hidden");
   syncVehiclePreviewVisibility();
   startButton.textContent = "Restart Game";
 
-  gameLoop();
+  await beginLevel(1);
 }
 
-function endGame() {
+function endGame(title = "Crash!") {
   state.active = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   playCrashSound();
   maybeUpdateBestScore();
   message.innerHTML = `
-    <h2>Crash!</h2>
-    <p>${state.racerName}, your run scored ${state.score}.</p>
-    <p>Highest score this session: ${state.bestScore}</p>
-    <div class="auth-actions">
-      <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
-      <button id="newGameButton" class="auth-button secondary" type="button">New Game</button>
+    <div class="game-over-panel">
+      <p class="game-over-eyebrow">Race Over</p>
+      <h2>${title}</h2>
+      <p>${state.racerName}, your run scored ${state.score}.</p>
+      <p>Highest score this session: ${state.bestScore}</p>
+      <div class="auth-actions">
+        <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
+        <button id="newGameButton" class="auth-button secondary" type="button">New Game</button>
+      </div>
+      <p>Press Restart Game to try again with the same vehicle, or choose New Game to reset best score and select another vehicle.</p>
     </div>
-    <p>Press Restart Game to try again with the same vehicle, or choose New Game to reset best score and select another vehicle.</p>
   `;
+  message.classList.add("game-over");
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
   document.getElementById("downloadScoreCardButton").addEventListener("click", saveScoreCard);
@@ -2119,11 +2607,33 @@ refreshSpeed();
 syncVehiclePreviewVisibility();
 updateSoundButton();
 updateBestScoreDisplay();
+updateLevelDisplay();
+updateLivesDisplay();
+updateFuelDisplay();
+applyLevelTheme();
 bindOverlayControls();
 showAuthGate();
 initializeSupabase();
 
 startButton.addEventListener("click", startGame);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && welcomeModal && !welcomeModal.classList.contains("hidden")) {
+    event.preventDefault();
+    triggerWelcomeStart();
+  }
+});
+
+gameArea.addEventListener("mousemove", (event) => {
+  updatePointerPosition(event.clientX, event.clientY);
+});
+
+gameArea.addEventListener("touchmove", (event) => {
+  const touch = event.touches[0];
+  if (touch) {
+    updatePointerPosition(touch.clientX, touch.clientY);
+  }
+}, { passive: true });
 
 soundButton.addEventListener("click", async () => {
   await primeMobileAudio();
