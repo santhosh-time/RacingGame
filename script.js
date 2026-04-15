@@ -10,6 +10,11 @@ const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-contr
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
 const initialMessageMarkup = message.innerHTML;
+const supabaseProjectUrl = "https://tvmvkjoubttuqnlkdciv.supabase.co";
+const supabasePublishableKey = "sb_publishable__allj6AeZXUn1xrfDU317A_f5B01zau";
+const supabaseClient = window.supabase?.createClient
+  ? window.supabase.createClient(supabaseProjectUrl, supabasePublishableKey)
+  : null;
 
 const gameBounds = {
   width: 420,
@@ -66,6 +71,8 @@ const state = {
   nextBoosterScore: 1000,
   animationId: 0,
   soundEnabled: true,
+  supabaseReady: false,
+  cloudSyncActive: false,
   enemyRespawns: 0,
   racerName: "Guest Racer",
   bestScore: 0,
@@ -97,8 +104,168 @@ function overlayRefs() {
     racerNameInput: document.getElementById("racerNameInput"),
     setupStatus: document.getElementById("setupStatus"),
     sessionModeText: document.getElementById("sessionModeText"),
+    cloudStatus: document.getElementById("cloudStatus"),
     vehicleOptions: Array.from(document.querySelectorAll(".vehicle-option")),
   };
+}
+
+function updateCloudStatus(messageText, isReady = false) {
+  const { cloudStatus } = overlayRefs();
+  if (!cloudStatus) {
+    return;
+  }
+
+  cloudStatus.textContent = messageText;
+  cloudStatus.classList.toggle("is-connected", isReady);
+  cloudStatus.classList.toggle("is-error", !isReady);
+}
+
+function normalizedRacerName() {
+  return state.racerName.trim().toLowerCase();
+}
+
+function isGuestRacerName(name = state.racerName) {
+  return !name || name.trim().toLowerCase() === "guest racer";
+}
+
+function withTimeout(promise, timeoutMs = 6000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error("Timed out while connecting to Supabase.")), timeoutMs);
+    }),
+  ]);
+}
+
+function formatSupabaseError(error, fallbackMessage) {
+  if (!error) {
+    return fallbackMessage;
+  }
+
+  const parts = [error.message, error.details, error.hint, error.code]
+    .filter(Boolean)
+    .map((part) => String(part).trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? `Supabase: ${parts.join(" | ")}` : fallbackMessage;
+}
+
+async function initializeSupabase() {
+  if (!supabaseClient) {
+    updateCloudStatus("Supabase: Client library did not load.", false);
+    return;
+  }
+
+  updateCloudStatus("Supabase: Connecting...", false);
+
+  try {
+    const { error } = await withTimeout(
+      supabaseClient
+        .from("racer_profiles")
+        .select("racer_name", { head: true, count: "exact" })
+        .limit(1)
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    state.supabaseReady = true;
+    state.cloudSyncActive = true;
+    updateCloudStatus("Supabase: Connected and ready for backend features.", true);
+
+    if (state.racerName) {
+      loadCloudBestScore();
+    }
+  } catch (error) {
+    state.supabaseReady = false;
+    state.cloudSyncActive = false;
+    updateCloudStatus(
+      formatSupabaseError(error, "Supabase: Connection failed. Check project URL, key, and table policies."),
+      false
+    );
+    console.error("Supabase initialization error:", error);
+  }
+}
+
+async function loadCloudBestScore() {
+  if (!state.supabaseReady || !supabaseClient || isGuestRacerName()) {
+    state.bestScore = 0;
+    updateBestScoreDisplay();
+    updateCloudStatus("Supabase: Guest Racer stays local only. Use a custom name to save online.", true);
+    return;
+  }
+
+  updateCloudStatus(`Supabase: Loading ${state.racerName}'s best score...`, false);
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("racer_profiles")
+      .select("best_score, favorite_vehicle")
+      .eq("racer_name", normalizedRacerName())
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      const { error: insertError } = await supabaseClient
+        .from("racer_profiles")
+        .insert({
+          racer_name: normalizedRacerName(),
+          best_score: 0,
+          favorite_vehicle: state.selectedVehicle,
+        });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      state.bestScore = 0;
+      updateBestScoreDisplay();
+      updateCloudStatus(`Supabase: ${state.racerName} is ready. Cloud best score starts at 0.`, true);
+      return;
+    }
+
+    state.bestScore = Number(data.best_score) || 0;
+    updateBestScoreDisplay();
+    updateCloudStatus(`Supabase: Loaded best score ${state.bestScore} for ${state.racerName}.`, true);
+  } catch (error) {
+    updateCloudStatus(
+      formatSupabaseError(error, "Supabase: Could not load best score yet. Check table policies."),
+      false
+    );
+    console.error("Supabase load error:", error);
+  }
+}
+
+async function saveCloudBestScore() {
+  if (!state.supabaseReady || !supabaseClient || !state.cloudSyncActive) {
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from("racer_profiles")
+      .upsert({
+        racer_name: normalizedRacerName(),
+        best_score: state.bestScore,
+        favorite_vehicle: state.selectedVehicle,
+      }, { onConflict: "racer_name" });
+
+    if (error) {
+      throw error;
+    }
+
+    updateCloudStatus(`Supabase: Synced best score ${state.bestScore} for ${state.racerName}.`, true);
+  } catch (error) {
+    updateCloudStatus(
+      formatSupabaseError(error, "Supabase: Best score save failed. Check table policies."),
+      false
+    );
+    console.error("Supabase save error:", error);
+  }
 }
 
 function updateSessionModeText() {
@@ -134,7 +301,13 @@ function setSetupStatus(messageText) {
 
 function setRacerName(name) {
   state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
+  state.cloudSyncActive = state.supabaseReady && !isGuestRacerName();
   showVehicleSetup();
+  if (state.supabaseReady) {
+    loadCloudBestScore();
+  } else {
+    updateCloudStatus("Supabase: Waiting for connection before loading cloud best score.", false);
+  }
 }
 
 function resetSessionForNewGame() {
@@ -191,6 +364,7 @@ function maybeUpdateBestScore() {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     updateBestScoreDisplay();
+    saveCloudBestScore();
   }
 }
 
@@ -1048,6 +1222,7 @@ updateSoundButton();
 updateBestScoreDisplay();
 bindOverlayControls();
 showAuthGate();
+initializeSupabase();
 
 startButton.addEventListener("click", startGame);
 

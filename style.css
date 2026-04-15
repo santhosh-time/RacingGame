@@ -343,6 +343,27 @@ body {
   font-size: 0.92rem;
 }
 
+.cloud-status {
+  width: 100%;
+  min-height: 1.4em;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  font-size: 0.9rem;
+  color: #ffd166;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cloud-status.is-connected {
+  color: #83f0b2;
+  border-color: rgba(131, 240, 178, 0.45);
+  background: rgba(32, 105, 74, 0.22);
+}
+
+.cloud-status.is-error {
+  color: #ffd166;
+}
+
 .vehicle-picker {
   width: 100%;
   display: grid;
