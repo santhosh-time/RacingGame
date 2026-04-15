@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Viral Racing Game Icon</title>
+  <desc id="desc">A top-view racing car on a stylized road.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#09111c"/>
+      <stop offset="100%" stop-color="#153148"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#263847"/>
+      <stop offset="100%" stop-color="#101b27"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff7b5c"/>
+      <stop offset="100%" stop-color="#d61f33"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c7f8ff"/>
+      <stop offset="100%" stop-color="#6cd4ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="126" y="34" width="260" height="444" rx="96" fill="url(#road)"/>
+  <rect x="244" y="58" width="24" height="80" rx="12" fill="#ffd166"/>
+  <rect x="244" y="174" width="24" height="80" rx="12" fill="#ffd166"/>
+  <rect x="244" y="290" width="24" height="80" rx="12" fill="#ffd166"/>
+  <rect x="244" y="406" width="24" height="48" rx="12" fill="#ffd166"/>
+  <g transform="translate(256 260)">
+    <rect x="-82" y="-126" width="164" height="252" rx="48" fill="url(#car)"/>
+    <rect x="-60" y="-88" width="120" height="58" rx="22" fill="url(#glass)"/>
+    <rect x="-60" y="18" width="120" height="70" rx="24" fill="url(#glass)"/>
+    <rect x="-96" y="-96" width="18" height="64" rx="8" fill="#0f131a"/>
+    <rect x="78" y="-96" width="18" height="64" rx="8" fill="#0f131a"/>
+    <rect x="-96" y="28" width="18" height="64" rx="8" fill="#0f131a"/>
+    <rect x="78" y="28" width="18" height="64" rx="8" fill="#0f131a"/>
+    <rect x="-42" y="-122" width="84" height="18" rx="9" fill="#ffe7bf" opacity="0.95"/>
+    <rect x="-52" y="106" width="104" height="14" rx="7" fill="#ffe7bf" opacity="0.92"/>
+  </g>
+</svg>
