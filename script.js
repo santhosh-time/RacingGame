@@ -2495,6 +2495,12 @@ function gameLoop() {
 }
 
 async function startGame() {
+  if (state.active || state.countdownRunning || state.pendingTransition) {
+    return;
+  }
+
+  startButton.blur();
+
   if (state.user && !state.accessActive) {
     updateCloudStatus("Your profile is ready, but your 24-hour pass is not active yet. Pay Rs.1 to unlock signed-in play.", false);
     guideToPaidAccess();
