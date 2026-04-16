@@ -13,6 +13,8 @@ const message = document.getElementById("message");
 const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
 const laserPointer = document.getElementById("laserPointer");
+const rainOverlay = document.getElementById("rainOverlay");
+const lightningFlash = document.getElementById("lightningFlash");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
@@ -73,6 +75,9 @@ const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
 const fuelDrainStep = 10;
 const fuelPickupRestore = 10;
+const barricadeSpawnTop = -140;
+const barricadeSpawnGap = 1200;
+const stormStartScore = 15000;
 
 const state = {
   active: false,
@@ -104,12 +109,17 @@ const state = {
   livesRemaining: 0,
   pickup: null,
   pickupType: "",
+  barricades: [],
   nextLevelScore: 8000,
   nextLaserScore: 1000,
   nextFuelScore: 8700,
   nextFuelDrainScore: 9000,
+  nextBarricadeScore: 9200,
   laserActiveUntil: 0,
   invincibleUntil: 0,
+  stormActive: false,
+  lightningActiveUntil: 0,
+  nextLightningAt: 0,
   pointer: {
     x: 210,
     y: 320,
@@ -184,6 +194,8 @@ function applyLevelTheme() {
   gameArea.classList.remove("level-1", "level-2", "level-3");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
+  gameArea.classList.toggle("storm-active", state.level === 2 && state.stormActive);
+  gameArea.classList.toggle("lightning-active", state.level === 2 && Date.now() < state.lightningActiveUntil);
 }
 
 function updatePlayerInvincibility() {
@@ -1252,9 +1264,13 @@ function resetSessionForNewGame() {
   state.nextLaserScore = 2000;
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
+  state.nextBarricadeScore = 9200;
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.fuelPercent = 100;
+  state.stormActive = false;
+  state.lightningActiveUntil = 0;
+  state.nextLightningAt = 0;
   state.pendingTransition = false;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
@@ -1265,6 +1281,7 @@ function resetSessionForNewGame() {
   applyLevelTheme();
   refreshSpeed();
   resetEnemies();
+  clearBarricades();
   playerCar.style.left = `${state.playerX}px`;
   roadLines.forEach((line, index) => {
     line.style.top = `${20 + index * 160}px`;
@@ -1937,6 +1954,10 @@ function enemyVehicleWidth(vehicleName) {
   return vehicleName.startsWith("bike-") ? gameBounds.bikeWidth : gameBounds.carWidth;
 }
 
+function barricadeWidth() {
+  return 56;
+}
+
 function pickEnemyVehicle() {
   const choices = enemyVehicleChoices.filter((vehicleName) => vehicleName !== state.selectedVehicle);
   const pool = choices.length > 0 ? choices : enemyVehicleChoices;
@@ -2074,6 +2095,42 @@ function createEnemy(y, left) {
   return enemy;
 }
 
+function createBarricade(y, left) {
+  const barricade = document.createElement("div");
+  barricade.className = "barricade";
+  barricade.innerHTML = "<span></span>";
+  barricade.style.top = `${y}px`;
+  barricade.style.left = `${clampVehicleLeft(left, barricadeWidth())}px`;
+  gameArea.appendChild(barricade);
+  return barricade;
+}
+
+function clearBarricades() {
+  state.barricades.forEach((barricade) => barricade.remove());
+  state.barricades = [];
+}
+
+function chooseBarricadeX(excludedXs = []) {
+  const width = barricadeWidth();
+  const attempts = 24;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const candidate = clampVehicleLeft(
+      roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - width),
+      width
+    );
+
+    if (excludedXs.every((left) => !positionsOverlap(candidate, width, left, width, 28))) {
+      return candidate;
+    }
+  }
+
+  return clampVehicleLeft(
+    roadPadding() + Math.random() * (gameBounds.width - roadPadding() * 2 - width),
+    width
+  );
+}
+
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
   const firstLane = chooseEnemyX([], true);
@@ -2103,6 +2160,20 @@ function clearBooster() {
     state.pickup = null;
     state.pickupType = "";
   }
+}
+
+function spawnBarricades() {
+  if (state.level !== 2 || state.score < state.nextBarricadeScore || state.barricades.length >= 2) {
+    return;
+  }
+
+  const occupiedXs = [
+    ...state.enemies.map((enemy) => parseFloat(enemy.style.left)),
+    ...state.barricades.map((barricade) => parseFloat(barricade.style.left)),
+  ];
+  const barricade = createBarricade(barricadeSpawnTop, chooseBarricadeX(occupiedXs));
+  state.barricades.push(barricade);
+  state.nextBarricadeScore += barricadeSpawnGap;
 }
 
 function spawnBooster() {
@@ -2211,6 +2282,34 @@ function activateLaserMode() {
   refreshSpeed();
 }
 
+function updateStormEffects() {
+  const stormShouldBeActive = state.level === 2 && state.score >= stormStartScore;
+  state.stormActive = stormShouldBeActive;
+
+  if (!stormShouldBeActive) {
+    state.lightningActiveUntil = 0;
+    state.nextLightningAt = 0;
+    applyLevelTheme();
+    return;
+  }
+
+  const now = Date.now();
+  if (!state.nextLightningAt) {
+    state.nextLightningAt = now + 1200 + Math.random() * 2200;
+  }
+
+  if (now >= state.nextLightningAt) {
+    state.lightningActiveUntil = now + 180;
+    state.nextLightningAt = now + 1400 + Math.random() * 2600;
+  }
+
+  if (now >= state.lightningActiveUntil && state.lightningActiveUntil !== 0) {
+    state.lightningActiveUntil = 0;
+  }
+
+  applyLevelTheme();
+}
+
 function increaseFuel(amount) {
   state.fuelPercent = Math.min(100, state.fuelPercent + amount);
   updateFuelDisplay();
@@ -2283,6 +2382,7 @@ async function beginLevel(levelNumber) {
     state.nextLaserScore = 1000;
     state.nextFuelScore = 8700;
     state.nextFuelDrainScore = 9000;
+    state.nextBarricadeScore = 9200;
     state.fuelPercent = 100;
   } else if (levelNumber === 2) {
     state.baseSpeed = levelTwoBaseSpeed;
@@ -2290,6 +2390,7 @@ async function beginLevel(levelNumber) {
     state.boostLevel = 0;
     state.nextLaserScore = Math.max(state.score + 1000, 2000);
     state.nextLevelScore = 20000;
+    state.nextBarricadeScore = Math.max(state.score + 700, 9200);
     clearBooster();
   } else {
     state.baseSpeed = Math.max(state.baseSpeed, levelThreeStartSpeed);
@@ -2300,6 +2401,12 @@ async function beginLevel(levelNumber) {
     state.fuelPercent = 100;
   }
 
+  state.stormActive = false;
+  state.lightningActiveUntil = 0;
+  state.nextLightningAt = 0;
+  clearBarricades();
+  resetEnemies();
+  state.playerX = middleLaneX();
   refreshSpeed();
   await primeMobileAudio();
   await startEngineSound();
@@ -2459,6 +2566,39 @@ function updateEnemies() {
   }
 }
 
+function updateBarricades() {
+  if (state.level !== 2) {
+    clearBarricades();
+    return;
+  }
+
+  const laserActive = Date.now() < state.laserActiveUntil;
+  state.barricades = state.barricades.filter((barricade) => {
+    const currentTop = parseFloat(barricade.style.top);
+    const nextTop = currentTop + state.currentSpeed + 0.9;
+
+    if (nextTop > gameBounds.height) {
+      barricade.remove();
+      return false;
+    }
+
+    barricade.style.top = `${nextTop}px`;
+
+    if (laserActive && !laserPointer.classList.contains("hidden") && isColliding(laserPointer, barricade)) {
+      barricade.remove();
+      return false;
+    }
+
+    if (Date.now() >= state.invincibleUntil && isColliding(playerCar, barricade)) {
+      barricade.remove();
+      handleVehicleCrash();
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function updateBooster() {
   if (!state.pickup) {
     return;
@@ -2497,11 +2637,14 @@ function gameLoop() {
   syncGameBounds();
   updateSpeedRamp();
   refreshSpeed();
+  updateStormEffects();
   updateRoadLines();
   updatePlayer();
   updatePlayerInvincibility();
   spawnBooster();
+  spawnBarricades();
   updateEnemies();
+  updateBarricades();
   updateBooster();
   updateLaserPointer();
   updateEngineSound();
@@ -2575,9 +2718,13 @@ async function startGame() {
   state.nextLaserScore = 2000;
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
+  state.nextBarricadeScore = 9200;
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.fuelPercent = 100;
+  state.stormActive = false;
+  state.lightningActiveUntil = 0;
+  state.nextLightningAt = 0;
   state.pendingTransition = false;
   state.enemyRespawns = 0;
 
@@ -2587,6 +2734,7 @@ async function startGame() {
   });
 
   resetEnemies();
+  clearBarricades();
   clearBooster();
   state.pickupType = "";
   playerCar.style.left = `${state.playerX}px`;
