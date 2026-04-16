@@ -29,6 +29,8 @@ const gameBounds = {
   roadPadding: 24,
   carWidth: 48,
   bikeWidth: 30,
+  jetWidth: 62,
+  birdWidth: 46,
 };
 
 const laneCount = 5;
@@ -42,8 +44,11 @@ const vehicleClasses = [
   "car-muscle",
   "car-electric",
   "car-truck",
+  "jet-silver",
+  "jet-gold",
+  "jet-stealth",
 ];
-const enemyVehicleChoices = [
+const roadEnemyVehicleChoices = [
   "bike-street",
   "bike-speed",
   "bike-dirt",
@@ -52,6 +57,11 @@ const enemyVehicleChoices = [
   "car-muscle",
   "car-electric",
   "car-truck",
+];
+const birdEnemyChoices = [
+  "bird-eagle",
+  "bird-falcon",
+  "bird-gull",
 ];
 const roadWidthMeters = 14;
 const targetFramesPerSecond = 60;
@@ -66,9 +76,15 @@ const guestUnlimitedCouponCode = "urinfinity";
 const accessWindowHours = 24;
 const maxAccessHours = 48;
 const levelOneBaseSpeed = 4.8;
-const levelTwoBaseSpeed = Number((levelOneBaseSpeed * 1.2).toFixed(2));
+const levelTwoBaseSpeed = 6.94;
+const levelTwoTargetSpeed = 11.11;
+const levelTwoEndScore = 15000;
+const levelTwoWarmupDurationMs = 5000;
 const levelThreeTargetBaseSpeed = Number((levelOneBaseSpeed * 2).toFixed(2));
 const levelThreeStartSpeed = levelTwoBaseSpeed;
+const levelFourStartScore = 25000;
+const levelFourBaseSpeed = 3.8;
+const levelFourTargetSpeed = 5.6;
 const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
 const fuelDrainStep = 10;
@@ -108,12 +124,16 @@ const state = {
   pickupType: "",
   barricades: [],
   nextLevelScore: 8000,
+  levelStartScore: 0,
   nextLaserScore: 1000,
   nextFuelScore: 8700,
   nextFuelDrainScore: 9000,
   nextBarricadeScore: 9200,
+  levelTwoWarmupStartAt: 0,
+  levelTwoWarmupUntil: 0,
   laserActiveUntil: 0,
   invincibleUntil: 0,
+  levelFourSelectionOpen: false,
   pointer: {
     x: 210,
     y: 320,
@@ -121,6 +141,7 @@ const state = {
   fuelPercent: 100,
   countdownRunning: false,
   pendingTransition: false,
+  reviveRunning: false,
   accessActive: false,
   accessValidUntil: "",
   accessBusy: false,
@@ -151,17 +172,17 @@ function updateLevelDisplay() {
   }
 }
 
-function getLivesForLevel(levelNumber = state.level) {
+function getLivesAwardForLevel(levelNumber = state.level) {
   if (levelNumber === 1) {
-    return 3;
+    return 5;
   }
   if (levelNumber === 2) {
     return 2;
   }
-  if (levelNumber >= 3) {
+  if (levelNumber === 3) {
     return 1;
   }
-  return 3;
+  return 0;
 }
 
 function updateLivesDisplay() {
@@ -175,7 +196,7 @@ function updateFuelDisplay() {
     return;
   }
 
-  const showFuel = state.level >= 3;
+  const showFuel = state.level === 3;
   fuelCard.classList.toggle("hidden", !showFuel);
   if (showFuel) {
     fuelDisplay.textContent = `${Math.max(0, Math.round(state.fuelPercent))}%`;
@@ -184,8 +205,8 @@ function updateFuelDisplay() {
 
 function applyLevelTheme() {
   const levelClass = `level-${state.level}`;
-  document.body.classList.remove("level-1", "level-2", "level-3");
-  gameArea.classList.remove("level-1", "level-2", "level-3");
+  document.body.classList.remove("level-1", "level-2", "level-3", "level-4");
+  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
 }
@@ -1257,10 +1278,15 @@ function resetSessionForNewGame() {
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
   state.nextBarricadeScore = 9200;
+  state.levelStartScore = 0;
+  state.levelTwoWarmupStartAt = 0;
+  state.levelTwoWarmupUntil = 0;
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
+  state.reviveRunning = false;
   state.fuelPercent = 100;
   state.pendingTransition = false;
+  state.levelFourSelectionOpen = false;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
   updateBestScoreDisplay();
@@ -1529,6 +1555,9 @@ function prettifyVehicleName(vehicleName = state.selectedVehicle) {
     "car-muscle": "Muscle Car",
     "car-electric": "Electric Car",
     "car-truck": "Truck",
+    "jet-silver": "Silver Jet",
+    "jet-gold": "Gold Jet",
+    "jet-stealth": "Stealth Jet",
   };
 
   return names[vehicleName] || "Racing Vehicle";
@@ -1544,6 +1573,9 @@ function vehicleAccentColor(vehicleName = state.selectedVehicle) {
     "car-muscle": "#f6c36b",
     "car-electric": "#81d4fa",
     "car-truck": "#90a4ae",
+    "jet-silver": "#b9d7ff",
+    "jet-gold": "#ffd166",
+    "jet-stealth": "#a7b2c2",
   };
 
   return colors[vehicleName] || "#73efff";
@@ -1552,6 +1584,7 @@ function vehicleAccentColor(vehicleName = state.selectedVehicle) {
 function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   const accent = vehicleAccentColor(vehicleName);
   const isBike = vehicleName.startsWith("bike-");
+  const isJet = vehicleName.startsWith("jet-");
   const isTruck = vehicleName === "car-truck";
   const isElectric = vehicleName.includes("electric");
   const isMuscle = vehicleName === "car-muscle";
@@ -1605,6 +1638,59 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
       ctx.fillStyle = "#3a2610";
       ctx.fillRect(-28, 48, 56, 30);
     }
+  } else if (isJet) {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(0, -174);
+    ctx.bezierCurveTo(18, -162, 22, -122, 20, -76);
+    ctx.lineTo(78, -28);
+    ctx.lineTo(36, -10);
+    ctx.lineTo(22, 18);
+    ctx.lineTo(68, 76);
+    ctx.lineTo(24, 70);
+    ctx.lineTo(16, 128);
+    ctx.lineTo(36, 164);
+    ctx.lineTo(10, 144);
+    ctx.lineTo(0, 182);
+    ctx.lineTo(-10, 144);
+    ctx.lineTo(-36, 164);
+    ctx.lineTo(-16, 128);
+    ctx.lineTo(-24, 70);
+    ctx.lineTo(-68, 76);
+    ctx.lineTo(-22, 18);
+    ctx.lineTo(-36, -10);
+    ctx.lineTo(-78, -28);
+    ctx.lineTo(-20, -76);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#eff6ff";
+    ctx.beginPath();
+    ctx.moveTo(0, -128);
+    ctx.lineTo(14, -86);
+    ctx.lineTo(12, 92);
+    ctx.lineTo(0, 138);
+    ctx.lineTo(-12, 92);
+    ctx.lineTo(-14, -86);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(17, 30, 43, 0.24)";
+    ctx.fillRect(-9, -52, 18, 168);
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+    ctx.beginPath();
+    ctx.roundRect(-7, -108, 14, 42, 7);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.26)";
+    ctx.beginPath();
+    ctx.moveTo(-58, -18);
+    ctx.lineTo(58, -18);
+    ctx.lineTo(20, 6);
+    ctx.lineTo(-20, 6);
+    ctx.closePath();
+    ctx.fill();
   } else {
     ctx.fillStyle = accent;
     ctx.beginPath();
@@ -1922,11 +2008,17 @@ function playCrashSound() {
 }
 
 function vehicleWidth() {
-  return state.selectedVehicle.startsWith("bike-") ? gameBounds.bikeWidth : gameBounds.carWidth;
+  if (state.selectedVehicle.startsWith("bike-")) {
+    return gameBounds.bikeWidth;
+  }
+  if (state.selectedVehicle.startsWith("jet-")) {
+    return gameBounds.jetWidth;
+  }
+  return gameBounds.carWidth;
 }
 
 function refreshSpeed() {
-  const laserMultiplier = Date.now() < state.laserActiveUntil ? laserSpeedMultiplier : 1;
+  const laserMultiplier = 1;
   const levelOneBoostMultiplier = state.level === 1 ? boostMultiplier ** state.boostLevel : 1;
   state.currentSpeed = state.baseSpeed * levelOneBoostMultiplier * laserMultiplier;
   speedDisplay.textContent = `${getCurrentKmph()} km/h`;
@@ -1940,7 +2032,16 @@ function roadPadding() {
 }
 
 function enemyVehicleWidth(vehicleName) {
-  return vehicleName.startsWith("bike-") ? gameBounds.bikeWidth : gameBounds.carWidth;
+  if (vehicleName.startsWith("bike-")) {
+    return gameBounds.bikeWidth;
+  }
+  if (vehicleName.startsWith("bird-")) {
+    return gameBounds.birdWidth;
+  }
+  if (vehicleName.startsWith("jet-")) {
+    return gameBounds.jetWidth;
+  }
+  return gameBounds.carWidth;
 }
 
 function barricadeWidth() {
@@ -1948,8 +2049,9 @@ function barricadeWidth() {
 }
 
 function pickEnemyVehicle() {
-  const choices = enemyVehicleChoices.filter((vehicleName) => vehicleName !== state.selectedVehicle);
-  const pool = choices.length > 0 ? choices : enemyVehicleChoices;
+  const poolSource = state.level === 4 ? birdEnemyChoices : roadEnemyVehicleChoices;
+  const choices = poolSource.filter((vehicleName) => vehicleName !== state.selectedVehicle);
+  const pool = choices.length > 0 ? choices : poolSource;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -1986,7 +2088,7 @@ function positionsOverlap(leftA, widthA, leftB, widthB, gap = 18) {
 }
 
 function chooseEnemyX(excludedXs = [], preferPlayerX = false) {
-  const width = gameBounds.carWidth;
+  const width = state.level === 4 ? gameBounds.birdWidth : gameBounds.carWidth;
   const playerTargetX = clampVehicleLeft(playerCenterX() - width / 2, width);
 
   if (preferPlayerX) {
@@ -2122,14 +2224,15 @@ function chooseBarricadeX(excludedXs = []) {
 
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
-  const firstLane = chooseEnemyX([], true);
-  const secondLane = chooseEnemyX([firstLane], false);
-  const thirdLane = chooseEnemyX([firstLane, secondLane], false);
-  state.enemies = [
-    createEnemy(-160, firstLane),
-    createEnemy(-360, secondLane),
-    createEnemy(-560, thirdLane),
-  ];
+  const spawnCount = state.level === 4 ? 2 : 3;
+  const spawnTops = state.level === 4 ? [-120, -360] : [-160, -360, -560];
+  const lanes = [];
+
+  for (let index = 0; index < spawnCount; index += 1) {
+    lanes.push(chooseEnemyX(lanes, index === 0));
+  }
+
+  state.enemies = lanes.map((lane, index) => createEnemy(spawnTops[index], lane));
 }
 
 function createPickup(y, pickupType) {
@@ -2167,6 +2270,10 @@ function spawnBarricades() {
 
 function spawnBooster() {
   if (state.pickup) {
+    return;
+  }
+
+  if (state.level >= 4) {
     return;
   }
 
@@ -2233,6 +2340,30 @@ function removeBoostLevel() {
 }
 
 function updateSpeedRamp() {
+  if (state.level === 2) {
+    const now = Date.now();
+    if (state.levelTwoWarmupUntil && now < state.levelTwoWarmupUntil) {
+      const warmupProgress = Math.max(
+        0,
+        Math.min(1, (now - state.levelTwoWarmupStartAt) / levelTwoWarmupDurationMs)
+      );
+      state.baseSpeed = levelTwoBaseSpeed * warmupProgress;
+      state.baseSpeedTarget = levelTwoBaseSpeed;
+      return;
+    }
+
+    if (state.levelTwoWarmupUntil) {
+      state.levelTwoWarmupUntil = 0;
+      state.baseSpeed = Math.max(state.baseSpeed, levelTwoBaseSpeed);
+    }
+
+    const scoreSpan = Math.max(1, levelTwoEndScore - state.levelStartScore);
+    const progress = Math.max(0, Math.min(1, (state.score - state.levelStartScore) / scoreSpan));
+    state.baseSpeedTarget = levelTwoBaseSpeed + (levelTwoTargetSpeed - levelTwoBaseSpeed) * progress;
+  } else if (state.level === 4) {
+    state.baseSpeedTarget = levelFourTargetSpeed;
+  }
+
   const difference = state.baseSpeedTarget - state.baseSpeed;
   if (Math.abs(difference) < 0.02) {
     state.baseSpeed = state.baseSpeedTarget;
@@ -2277,7 +2408,7 @@ function increaseFuel(amount) {
 }
 
 function handleFuelDrain() {
-  if (state.level < 3) {
+  if (state.level !== 3) {
     return;
   }
 
@@ -2314,6 +2445,46 @@ async function showCountdownOverlay(title, subtitle = "") {
   state.countdownRunning = false;
 }
 
+function showLevelFourSelection() {
+  state.levelFourSelectionOpen = true;
+  message.innerHTML = `
+    <div class="level-four-panel">
+      <p class="countdown-eyebrow">Congratulations</p>
+      <h2>Welcome To Level 4</h2>
+      <p>You are heading into the sky and unlocking private jets. Choose your jet to begin the air race.</p>
+      <div class="vehicle-group level-four-group">
+        <h3>Private Jets</h3>
+        <div class="vehicle-grid jet-grid">
+          <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
+            <span class="vehicle-preview jet-preview jet-silver"></span>
+            <span>Silver Jet</span>
+          </button>
+          <button class="vehicle-option jet-select-option" data-jet="jet-gold" type="button">
+            <span class="vehicle-preview jet-preview jet-gold"></span>
+            <span>Gold Jet</span>
+          </button>
+          <button class="vehicle-option jet-select-option" data-jet="jet-stealth" type="button">
+            <span class="vehicle-preview jet-preview jet-stealth"></span>
+            <span>Stealth Jet</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  message.classList.remove("hidden");
+  syncVehiclePreviewVisibility();
+
+  return new Promise((resolve) => {
+    const options = Array.from(message.querySelectorAll(".jet-select-option"));
+    options.forEach((option) => {
+      option.addEventListener("click", () => {
+        state.levelFourSelectionOpen = false;
+        resolve(option.dataset.jet);
+      }, { once: true });
+    });
+  });
+}
+
 async function beginLevel(levelNumber) {
   state.pendingTransition = true;
   state.active = false;
@@ -2325,12 +2496,19 @@ async function beginLevel(levelNumber) {
     ? "Get ready to build speed."
     : levelNumber === 2
       ? "Muddy roads ahead. Laser mode incoming."
-      : "Skyline sprint. Watch your fuel.";
+      : levelNumber === 3
+        ? "Skyline sprint. Watch your fuel."
+        : "Take off into the clouds. Birds ahead.";
 
   await showCountdownOverlay(title, subtitle);
 
   state.level = levelNumber;
-  state.livesRemaining = getLivesForLevel(levelNumber);
+  state.levelStartScore = state.score;
+  if (levelNumber === 1) {
+    state.livesRemaining = getLivesAwardForLevel(levelNumber);
+  } else {
+    state.livesRemaining += getLivesAwardForLevel(levelNumber);
+  }
   updateLevelDisplay();
   updateLivesDisplay();
   applyLevelTheme();
@@ -2346,20 +2524,31 @@ async function beginLevel(levelNumber) {
     state.nextBarricadeScore = 9200;
     state.fuelPercent = 100;
   } else if (levelNumber === 2) {
-    state.baseSpeed = levelTwoBaseSpeed;
+    state.baseSpeed = 0;
     state.baseSpeedTarget = levelTwoBaseSpeed;
+    state.levelTwoWarmupStartAt = Date.now();
+    state.levelTwoWarmupUntil = state.levelTwoWarmupStartAt + levelTwoWarmupDurationMs;
     state.boostLevel = 0;
     state.nextLaserScore = Math.max(state.score + 1000, 2000);
-    state.nextLevelScore = 20000;
+    state.nextLevelScore = levelTwoEndScore;
     state.nextBarricadeScore = Math.max(state.score + 700, 9200);
     clearBooster();
   } else {
-    state.baseSpeed = Math.max(state.baseSpeed, levelThreeStartSpeed);
-    state.baseSpeedTarget = levelThreeTargetBaseSpeed;
-    state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
-    state.nextFuelScore = Math.max(state.score + 700, 8700);
-    state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
-    state.fuelPercent = 100;
+    state.levelTwoWarmupStartAt = 0;
+    state.levelTwoWarmupUntil = 0;
+    if (levelNumber === 3) {
+      state.baseSpeed = Math.max(state.baseSpeed, levelThreeStartSpeed);
+      state.baseSpeedTarget = levelThreeTargetBaseSpeed;
+      state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
+      state.nextFuelScore = Math.max(state.score + 700, 8700);
+      state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
+      state.fuelPercent = 100;
+    } else {
+      state.baseSpeed = levelFourBaseSpeed;
+      state.baseSpeedTarget = levelFourTargetSpeed;
+      state.fuelPercent = 100;
+      clearBooster();
+    }
   }
 
   clearBarricades();
@@ -2403,26 +2592,57 @@ function updatePlayer() {
   playerCar.style.left = `${state.playerX}px`;
 }
 
-function handleVehicleCrash() {
-  if (Date.now() < state.invincibleUntil) {
+async function handleVehicleCrash() {
+  if (Date.now() < state.invincibleUntil || state.reviveRunning || state.pendingTransition || state.countdownRunning) {
+    return;
+  }
+
+  if (state.level === 4) {
+    endGame("Bird strike!");
     return;
   }
 
   if (state.livesRemaining > 0) {
     state.livesRemaining -= 1;
-    state.invincibleUntil = Date.now() + 1800;
+    state.reviveRunning = true;
+    state.active = false;
+    state.pendingTransition = true;
+    cancelAnimationFrame(state.animationId);
+    stopEngineSound();
     state.playerX = middleLaneX();
     playerCar.style.left = `${state.playerX}px`;
     resetEnemies();
+    clearBarricades();
     clearBooster();
     updateLivesDisplay();
     playCrashSound();
+    message.innerHTML = `
+      <div class="countdown-panel">
+        <p class="countdown-eyebrow">Lifeline Used</p>
+        <h2>${state.livesRemaining}</h2>
+        <p>${state.livesRemaining === 1 ? "1 life remaining." : `${state.livesRemaining} lives remaining.`}</p>
+      </div>
+    `;
+    message.classList.remove("hidden");
+    syncVehiclePreviewVisibility();
     updateCloudStatus(
-      state.livesRemaining > 0
-        ? `${state.racerName}, lifeline used. ${state.livesRemaining} life remaining.`
-        : `${state.racerName}, lifeline used. No lives left now. Stay sharp.`,
+      state.livesRemaining === 1
+        ? `${state.racerName}, lifeline used. 1 life remaining.`
+        : `${state.racerName}, lifeline used. ${state.livesRemaining} lives remaining.`,
       false,
     );
+    await new Promise((resolve) => window.setTimeout(resolve, 1100));
+    await showCountdownOverlay(
+      "Back On Track",
+      state.livesRemaining === 1 ? "1 life remaining." : `${state.livesRemaining} lives remaining.`
+    );
+    state.invincibleUntil = Date.now() + 1800;
+    await primeMobileAudio();
+    await startEngineSound();
+    state.active = true;
+    state.pendingTransition = false;
+    state.reviveRunning = false;
+    gameLoop();
     return;
   }
 
@@ -2462,10 +2682,14 @@ function updateEnemies() {
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
     const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
-    let nextTop = top + state.currentSpeed + 1.2;
+    const respawnTop = state.level === 4 ? -140 : -220;
+    const movementStep = state.level === 4
+      ? Math.max(2.2, state.currentSpeed * 0.58)
+      : state.currentSpeed + 1.2;
+    let nextTop = top + movementStep;
 
     if (nextTop > gameBounds.height) {
-      nextTop = -220;
+      nextTop = respawnTop;
       state.enemyRespawns += 1;
       const occupiedLanes = state.enemies
         .filter((item) => item !== enemy)
@@ -2473,7 +2697,7 @@ function updateEnemies() {
           left: parseFloat(item.style.left),
           width: enemyVehicleWidth(item.dataset.vehicle || "car-sport"),
         }));
-      const forcePlayerLane = state.enemyRespawns % 2 === 0;
+      const forcePlayerLane = state.level === 4 ? Math.random() < 0.22 : state.enemyRespawns % 2 === 0;
       const nextLane = chooseEnemyX(
         occupiedLanes.map((item) => item.left),
         forcePlayerLane
@@ -2502,7 +2726,7 @@ function updateEnemies() {
       );
 
       if (pointerInsideEnemy) {
-        nextTop = -220;
+        nextTop = respawnTop;
         const nextLane = chooseEnemyX(
           state.enemies.filter((item) => item !== enemy).map((item) => parseFloat(item.style.left)),
           false
@@ -2587,7 +2811,7 @@ function updateBooster() {
   }
 }
 
-function gameLoop() {
+async function gameLoop() {
   if (!state.active) {
     return;
   }
@@ -2615,9 +2839,26 @@ function gameLoop() {
     return;
   }
 
-  if (state.level === 2 && state.score >= 20000 && !state.pendingTransition) {
+  if (state.level === 2 && state.score >= levelTwoEndScore && !state.pendingTransition) {
     beginLevel(3);
     return;
+  }
+
+  if (state.level === 3 && state.score >= levelFourStartScore && !state.pendingTransition && !state.levelFourSelectionOpen) {
+    state.pendingTransition = true;
+    state.active = false;
+    cancelAnimationFrame(state.animationId);
+    stopEngineSound();
+    clearBooster();
+    const selectedJet = await showLevelFourSelection();
+    applyVehicleSelection(selectedJet || "jet-silver");
+    await beginLevel(4);
+    return;
+  }
+
+  if (state.level >= 4) {
+    clearBooster();
+    clearBarricades();
   }
 
   state.animationId = requestAnimationFrame(gameLoop);
@@ -2676,10 +2917,15 @@ async function startGame() {
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
   state.nextBarricadeScore = 9200;
+  state.levelStartScore = 0;
+  state.levelTwoWarmupStartAt = 0;
+  state.levelTwoWarmupUntil = 0;
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
+  state.reviveRunning = false;
   state.fuelPercent = 100;
   state.pendingTransition = false;
+  state.levelFourSelectionOpen = false;
   state.enemyRespawns = 0;
 
   roadLines.forEach((line, index) => {

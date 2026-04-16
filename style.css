@@ -41,6 +41,13 @@ body.level-3 {
     linear-gradient(180deg, #0d1f38, #07111e);
 }
 
+body.level-4 {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.74), transparent 18%),
+    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.68), transparent 20%),
+    linear-gradient(180deg, #d7f1ff, #8dceff 46%, #337ed0 100%);
+}
+
 .app {
   width: min(94vw, 820px);
   display: grid;
@@ -179,6 +186,21 @@ body.level-3 {
   border-right-color: #dfeeff;
 }
 
+.game-area.level-4 {
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.92) 0 7%, rgba(255, 255, 255, 0) 8%),
+    radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.88) 0 9%, rgba(255, 255, 255, 0) 10%),
+    radial-gradient(circle at 72% 16%, rgba(255, 255, 255, 0.86) 0 8%, rgba(255, 255, 255, 0) 9%),
+    radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.82) 0 10%, rgba(255, 255, 255, 0) 11%),
+    linear-gradient(180deg, #9fd5ff 0 32%, #63b6ff 32% 68%, #2f88db 68% 100%);
+  border-left-color: #ecf7ff;
+  border-right-color: #ecf7ff;
+}
+
+.game-area.level-4 .road-line {
+  opacity: 0;
+}
+
 .welcome-modal {
   position: absolute;
   inset: 0;
@@ -295,6 +317,18 @@ body.level-3 {
   height: 84px;
 }
 
+.player-vehicle[class*="jet-"],
+.jet-preview {
+  width: 62px;
+  height: 118px;
+}
+
+.enemy-vehicle[class*="bird-"],
+.bird-preview {
+  width: 46px;
+  height: 64px;
+}
+
 .bike-street {
   background-image: url("assets/bike-street.svg");
 }
@@ -325,6 +359,79 @@ body.level-3 {
 
 .car-truck {
   background-image: url("assets/car-truck.svg");
+}
+
+.jet-silver,
+.jet-gold,
+.jet-stealth {
+  position: relative;
+  clip-path: polygon(50% 0%, 58% 10%, 60% 44%, 86% 54%, 60% 60%, 58% 84%, 68% 100%, 50% 90%, 32% 100%, 42% 84%, 40% 60%, 14% 54%, 40% 44%, 42% 10%);
+  box-shadow: 0 10px 18px rgba(10, 18, 28, 0.24);
+}
+
+.jet-silver {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.74) 0 14%, transparent 14% 86%, rgba(255, 255, 255, 0.34) 86% 100%),
+    linear-gradient(180deg, #f8fcff 0 18%, #d9e9f8 18% 38%, #93bfe8 38% 70%, #35587c 70% 100%);
+}
+
+.jet-gold {
+  background:
+    linear-gradient(90deg, rgba(255, 248, 214, 0.72) 0 14%, transparent 14% 86%, rgba(255, 255, 255, 0.26) 86% 100%),
+    linear-gradient(180deg, #fff8db 0 18%, #ffe49c 18% 38%, #ffd166 38% 70%, #b67612 70% 100%);
+}
+
+.jet-stealth {
+  background:
+    linear-gradient(90deg, rgba(230, 238, 247, 0.32) 0 14%, transparent 14% 86%, rgba(255, 255, 255, 0.12) 86% 100%),
+    linear-gradient(180deg, #e2e7ef 0 18%, #a4afbf 18% 38%, #6e7c8e 38% 70%, #263140 70% 100%);
+}
+
+.jet-silver::before,
+.jet-gold::before,
+.jet-stealth::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  width: 18%;
+  height: 58%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 255, 0.22));
+}
+
+.jet-silver::after,
+.jet-gold::after,
+.jet-stealth::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 54%;
+  height: 18%;
+  transform: translateX(-50%);
+  clip-path: polygon(0 50%, 26% 16%, 74% 16%, 100% 50%, 74% 84%, 26% 84%);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.bird-eagle,
+.bird-falcon,
+.bird-gull {
+  box-shadow: 0 8px 14px rgba(18, 23, 30, 0.16);
+  clip-path: polygon(50% 18%, 70% 0%, 90% 20%, 100% 44%, 72% 34%, 58% 48%, 60% 100%, 40% 100%, 42% 48%, 28% 34%, 0% 44%, 10% 20%, 30% 0%);
+}
+
+.bird-eagle {
+  background: linear-gradient(180deg, #f2e1b1 0 24%, #7d5629 24% 100%);
+}
+
+.bird-falcon {
+  background: linear-gradient(180deg, #f0f3f8 0 20%, #7c8fa8 20% 100%);
+}
+
+.bird-gull {
+  background: linear-gradient(180deg, #ffffff 0 24%, #b8c4d3 24% 100%);
 }
 
 .pickup {
@@ -513,6 +620,29 @@ body.level-3 {
 
 .countdown-panel h2 {
   font-size: 4.6rem;
+}
+
+.level-four-panel {
+  min-height: 100%;
+  width: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+
+.level-four-panel h2 {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+.level-four-panel p {
+  max-width: 40ch;
+}
+
+.jet-grid {
+  width: min(100%, 700px);
 }
 
 .countdown-eyebrow {
@@ -896,11 +1026,18 @@ body.level-3 {
     margin: 0 10px;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: minmax(54px, auto);
+    align-items: stretch;
   }
 
   .stat-card,
   .compact-stat {
     min-width: 0;
+    width: 100%;
+    min-height: 54px;
+    padding: 4px 2px;
+    align-content: center;
+    justify-items: center;
   }
 
   .stat-card h1,
@@ -933,6 +1070,7 @@ body.level-3 {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    align-items: stretch;
   }
 
   .sound-button {
@@ -989,11 +1127,18 @@ body.level-3 {
     gap: 8px;
     padding: 8px 10px;
     grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: minmax(58px, auto);
+    align-items: stretch;
   }
 
   .stat-card,
   .compact-stat {
     min-width: 0;
+    width: 100%;
+    min-height: 58px;
+    padding: 4px 2px;
+    align-content: center;
+    justify-items: center;
   }
 
   .stat-card h1,
@@ -1025,6 +1170,7 @@ body.level-3 {
     display: grid;
     justify-content: stretch;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
   }
 
   .game-area {
