@@ -171,12 +171,6 @@ body.level-3 {
   border-right-color: #cdb69f;
 }
 
-.game-area.level-2.storm-active {
-  background:
-    linear-gradient(180deg, rgba(123, 145, 170, 0.16), rgba(15, 22, 31, 0.12)),
-    linear-gradient(90deg, #463226 0 25%, #52392b 25% 50%, #5d4331 50% 75%, #463226 75% 100%);
-}
-
 .game-area.level-3 {
   background:
     linear-gradient(180deg, rgba(131, 191, 255, 0.1), rgba(20, 38, 61, 0.12)),
@@ -244,40 +238,6 @@ body.level-3 {
   border-radius: 999px;
   background: var(--lane-mark);
   opacity: 0.95;
-}
-
-.rain-overlay,
-.lightning-flash {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.rain-overlay {
-  opacity: 0;
-  transition: opacity 220ms ease;
-  background-image:
-    linear-gradient(115deg, rgba(255, 255, 255, 0) 0 44%, rgba(197, 225, 255, 0.45) 44% 47%, rgba(255, 255, 255, 0) 47% 100%),
-    linear-gradient(115deg, rgba(255, 255, 255, 0) 0 38%, rgba(197, 225, 255, 0.32) 38% 41%, rgba(255, 255, 255, 0) 41% 100%);
-  background-size: 130px 130px, 180px 180px;
-  animation: rain-fall 0.55s linear infinite;
-}
-
-.game-area.storm-active .rain-overlay {
-  opacity: 0.95;
-}
-
-.lightning-flash {
-  opacity: 0;
-  background:
-    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.12) 24%, rgba(255, 255, 255, 0) 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
-  transition: opacity 100ms linear;
-}
-
-.game-area.lightning-active .lightning-flash {
-  opacity: 1;
 }
 
 .line-1 { top: 20px; }
@@ -508,15 +468,6 @@ body.level-3 {
   width: 46px;
   height: 2px;
   transform: translateY(-50%);
-}
-
-@keyframes rain-fall {
-  from {
-    background-position: 0 -140px, 0 -180px;
-  }
-  to {
-    background-position: -70px 140px, -90px 180px;
-  }
 }
 
 .message {

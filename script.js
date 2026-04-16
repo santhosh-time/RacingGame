@@ -13,8 +13,6 @@ const message = document.getElementById("message");
 const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
 const laserPointer = document.getElementById("laserPointer");
-const rainOverlay = document.getElementById("rainOverlay");
-const lightningFlash = document.getElementById("lightningFlash");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
@@ -77,7 +75,6 @@ const fuelDrainStep = 10;
 const fuelPickupRestore = 10;
 const barricadeSpawnTop = -140;
 const barricadeSpawnGap = 1200;
-const stormStartScore = 15000;
 
 const state = {
   active: false,
@@ -117,9 +114,6 @@ const state = {
   nextBarricadeScore: 9200,
   laserActiveUntil: 0,
   invincibleUntil: 0,
-  stormActive: false,
-  lightningActiveUntil: 0,
-  nextLightningAt: 0,
   pointer: {
     x: 210,
     y: 320,
@@ -194,8 +188,6 @@ function applyLevelTheme() {
   gameArea.classList.remove("level-1", "level-2", "level-3");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
-  gameArea.classList.toggle("storm-active", state.level === 2 && state.stormActive);
-  gameArea.classList.toggle("lightning-active", state.level === 2 && Date.now() < state.lightningActiveUntil);
 }
 
 function updatePlayerInvincibility() {
@@ -1268,9 +1260,6 @@ function resetSessionForNewGame() {
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.fuelPercent = 100;
-  state.stormActive = false;
-  state.lightningActiveUntil = 0;
-  state.nextLightningAt = 0;
   state.pendingTransition = false;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
@@ -2282,34 +2271,6 @@ function activateLaserMode() {
   refreshSpeed();
 }
 
-function updateStormEffects() {
-  const stormShouldBeActive = state.level === 2 && state.score >= stormStartScore;
-  state.stormActive = stormShouldBeActive;
-
-  if (!stormShouldBeActive) {
-    state.lightningActiveUntil = 0;
-    state.nextLightningAt = 0;
-    applyLevelTheme();
-    return;
-  }
-
-  const now = Date.now();
-  if (!state.nextLightningAt) {
-    state.nextLightningAt = now + 1200 + Math.random() * 2200;
-  }
-
-  if (now >= state.nextLightningAt) {
-    state.lightningActiveUntil = now + 180;
-    state.nextLightningAt = now + 1400 + Math.random() * 2600;
-  }
-
-  if (now >= state.lightningActiveUntil && state.lightningActiveUntil !== 0) {
-    state.lightningActiveUntil = 0;
-  }
-
-  applyLevelTheme();
-}
-
 function increaseFuel(amount) {
   state.fuelPercent = Math.min(100, state.fuelPercent + amount);
   updateFuelDisplay();
@@ -2401,9 +2362,6 @@ async function beginLevel(levelNumber) {
     state.fuelPercent = 100;
   }
 
-  state.stormActive = false;
-  state.lightningActiveUntil = 0;
-  state.nextLightningAt = 0;
   clearBarricades();
   resetEnemies();
   state.playerX = middleLaneX();
@@ -2637,7 +2595,6 @@ function gameLoop() {
   syncGameBounds();
   updateSpeedRamp();
   refreshSpeed();
-  updateStormEffects();
   updateRoadLines();
   updatePlayer();
   updatePlayerInvincibility();
@@ -2722,9 +2679,6 @@ async function startGame() {
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.fuelPercent = 100;
-  state.stormActive = false;
-  state.lightningActiveUntil = 0;
-  state.nextLightningAt = 0;
   state.pendingTransition = false;
   state.enemyRespawns = 0;
 
