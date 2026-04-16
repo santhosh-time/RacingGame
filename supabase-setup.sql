@@ -15,6 +15,7 @@ create table if not exists public.profiles (
   racer_name text not null,
   best_score integer not null default 0,
   best_score_vehicle text,
+  best_score_level integer not null default 1,
   favorite_vehicle text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
@@ -23,6 +24,7 @@ create table if not exists public.profiles (
 alter table public.profiles add column if not exists racer_name text;
 alter table public.profiles add column if not exists best_score integer not null default 0;
 alter table public.profiles add column if not exists best_score_vehicle text;
+alter table public.profiles add column if not exists best_score_level integer not null default 1;
 alter table public.profiles add column if not exists favorite_vehicle text;
 alter table public.profiles add column if not exists created_at timestamptz not null default timezone('utc', now());
 alter table public.profiles add column if not exists updated_at timestamptz not null default timezone('utc', now());

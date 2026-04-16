@@ -99,6 +99,7 @@ const state = {
   racerName: "Guest Racer",
   bestScore: 0,
   bestScoreVehicle: "bike-street",
+  bestScoreLevel: 1,
   level: 1,
   livesRemaining: 0,
   pickup: null,
@@ -147,13 +148,16 @@ function updateLevelDisplay() {
 }
 
 function getLivesForLevel(levelNumber = state.level) {
-  if (levelNumber >= 3) {
-    return 2;
+  if (levelNumber === 1) {
+    return 3;
   }
   if (levelNumber === 2) {
+    return 2;
+  }
+  if (levelNumber >= 3) {
     return 1;
   }
-  return 0;
+  return 3;
 }
 
 function updateLivesDisplay() {
@@ -684,7 +688,7 @@ async function loadProfile() {
   try {
     const { data, error } = await supabaseClient
       .from("profiles")
-      .select("racer_name, best_score, favorite_vehicle, best_score_vehicle")
+      .select("racer_name, best_score, favorite_vehicle, best_score_vehicle, best_score_level")
       .eq("user_id", state.user.id)
       .maybeSingle();
 
@@ -702,6 +706,7 @@ async function loadProfile() {
           best_score: 0,
           favorite_vehicle: state.selectedVehicle,
           best_score_vehicle: state.selectedVehicle,
+          best_score_level: 1,
         }, { onConflict: "user_id" });
 
       if (upsertError) {
@@ -710,7 +715,7 @@ async function loadProfile() {
 
       const { data: createdProfile, error: createdProfileError } = await supabaseClient
         .from("profiles")
-        .select("racer_name, best_score, favorite_vehicle, best_score_vehicle")
+        .select("racer_name, best_score, favorite_vehicle, best_score_vehicle, best_score_level")
         .eq("user_id", state.user.id)
         .maybeSingle();
 
@@ -723,6 +728,7 @@ async function loadProfile() {
       state.bestScoreVehicle = vehicleClasses.includes(createdProfile?.best_score_vehicle)
         ? createdProfile.best_score_vehicle
         : (vehicleClasses.includes(createdProfile?.favorite_vehicle) ? createdProfile.favorite_vehicle : state.selectedVehicle);
+      state.bestScoreLevel = Math.max(1, Number(createdProfile?.best_score_level) || 1);
       if (createdProfile?.favorite_vehicle && vehicleClasses.includes(createdProfile.favorite_vehicle)) {
         applyVehicleSelection(createdProfile.favorite_vehicle);
       }
@@ -738,6 +744,7 @@ async function loadProfile() {
     state.bestScoreVehicle = vehicleClasses.includes(data.best_score_vehicle)
       ? data.best_score_vehicle
       : (vehicleClasses.includes(data.favorite_vehicle) ? data.favorite_vehicle : state.selectedVehicle);
+    state.bestScoreLevel = Math.max(1, Number(data.best_score_level) || 1);
     if (data.favorite_vehicle && vehicleClasses.includes(data.favorite_vehicle)) {
       applyVehicleSelection(data.favorite_vehicle);
     }
@@ -768,6 +775,7 @@ async function saveCloudBestScore() {
         racer_name: state.racerName,
         best_score: state.bestScore,
         best_score_vehicle: state.bestScoreVehicle,
+        best_score_level: state.bestScoreLevel,
         favorite_vehicle: state.selectedVehicle,
       }, { onConflict: "user_id" });
 
@@ -806,6 +814,7 @@ async function saveProfileName() {
         racer_name: nextName,
         best_score: state.bestScore,
         best_score_vehicle: state.bestScoreVehicle,
+        best_score_level: state.bestScoreLevel,
         favorite_vehicle: state.selectedVehicle,
       }, { onConflict: "user_id" });
 
@@ -1177,6 +1186,7 @@ function startGuestMode(name = "") {
   state.user = null;
   state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
   state.bestScore = 0;
+  state.bestScoreLevel = 1;
   state.cloudSyncActive = false;
   state.accessActive = true;
   state.accessValidUntil = "";
@@ -1197,6 +1207,7 @@ function startGuestMode(name = "") {
 function showGuestProfileEditor() {
   state.racerName = "Guest Racer";
   state.bestScore = 0;
+  state.bestScoreLevel = 1;
   state.accessActive = false;
   state.accessValidUntil = "";
   updateBestScoreDisplay();
@@ -1231,6 +1242,7 @@ function resetSessionForNewGame() {
   state.level = 1;
   state.livesRemaining = 0;
   state.bestScore = 0;
+  state.bestScoreLevel = 1;
   state.boostLevel = 0;
   state.baseSpeed = levelOneBaseSpeed;
   state.baseSpeedTarget = levelOneBaseSpeed;
@@ -1446,6 +1458,7 @@ function maybeUpdateBestScore() {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
     state.bestScoreVehicle = state.selectedVehicle;
+    state.bestScoreLevel = state.level;
     updateBestScoreDisplay();
     saveCloudBestScore();
   }
@@ -1466,6 +1479,38 @@ function drawFittedCenteredText(ctx, text, x, y, maxWidth, startSize, minSize, c
 
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
+}
+
+function drawThreeDText(ctx, text, x, y, font, frontColor, depthColor = "rgba(3, 10, 18, 0.7)", glowColor = "rgba(115, 239, 255, 0.16)") {
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.fillStyle = depthColor;
+  ctx.fillText(text, x + 5, y + 6);
+
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = frontColor;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawFittedCenteredThreeDText(ctx, text, x, y, maxWidth, startSize, minSize, frontColor, depthColor = "rgba(3, 10, 18, 0.7)", glowColor = "rgba(115, 239, 255, 0.16)") {
+  let fontSize = startSize;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  while (fontSize >= minSize) {
+    ctx.font = `bold ${fontSize}px Verdana`;
+    if (ctx.measureText(text).width <= maxWidth) {
+      break;
+    }
+    fontSize -= 6;
+  }
+
+  drawThreeDText(ctx, text, x, y, `bold ${fontSize}px Verdana`, frontColor, depthColor, glowColor);
 }
 
 function prettifyVehicleName(vehicleName = state.selectedVehicle) {
@@ -1506,12 +1551,6 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   const isMuscle = vehicleName === "car-muscle";
   const isSport = vehicleName === "car-sport";
   const isDirt = vehicleName === "bike-dirt";
-
-  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
-  ctx.fillRect(210, 1100, 660, 450);
-  ctx.strokeStyle = "rgba(115, 239, 255, 0.35)";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(210, 1100, 660, 450);
 
   ctx.save();
   ctx.translate(540, 1295);
@@ -1633,6 +1672,7 @@ function createScoreCardImage() {
   const ctx = canvas.getContext("2d");
   const scoreCardHighScore = Math.max(state.bestScore, state.score);
   const scoreCardVehicle = state.bestScoreVehicle || state.selectedVehicle;
+  const scoreCardLevel = Math.max(1, Number(state.bestScoreLevel) || 1);
 
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gradient.addColorStop(0, "#0f2746");
@@ -1645,11 +1685,17 @@ function createScoreCardImage() {
   ctx.arc(860, 260, 260, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(7, 17, 28, 0.92)";
-  ctx.fillRect(120, 95, 840, 190);
-  ctx.strokeStyle = "rgba(115, 239, 255, 0.45)";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(120, 95, 840, 190);
+  ctx.fillStyle = "rgba(7, 17, 28, 0.54)";
+  ctx.fillRect(40, 40, 1000, 1840);
+  ctx.strokeStyle = "rgba(115, 239, 255, 0.34)";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(40, 40, 1000, 1840);
+
+  ctx.fillStyle = "rgba(7, 17, 28, 0.58)";
+  ctx.fillRect(110, 90, 860, 200);
+  ctx.strokeStyle = "rgba(115, 239, 255, 0.32)";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(110, 90, 860, 200);
 
   ctx.fillStyle = "#232323";
   ctx.fillRect(250, 270, 580, 1410);
@@ -1661,42 +1707,25 @@ function createScoreCardImage() {
     ctx.fillRect(535, y, 10, 90);
   }
 
-  ctx.fillStyle = "#f7fff7";
-  ctx.font = "bold 78px Verdana";
-  ctx.textAlign = "center";
-  ctx.fillText("Viral Racing Game", 540, 178);
-  ctx.fillStyle = "#cfd8dc";
-  ctx.font = "34px Verdana";
-  ctx.fillText("High Score Card", 540, 236);
+  drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");
+  drawThreeDText(ctx, "High Score Card", 540, 236, "34px Verdana", "#cfd8dc", "rgba(3, 10, 18, 0.7)", "rgba(255, 255, 255, 0.08)");
 
   ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
   ctx.fillRect(160, 390, 760, 190);
-  drawFittedCenteredText(ctx, state.racerName, 540, 485, 680, 108, 54, "#73efff");
+  drawFittedCenteredThreeDText(ctx, state.racerName, 540, 485, 680, 108, 54, "#73efff", "rgba(2, 9, 18, 0.82)", "rgba(115, 239, 255, 0.18)");
 
-  ctx.fillStyle = "rgba(8, 18, 28, 0.76)";
-  ctx.fillRect(210, 640, 660, 360);
-  ctx.strokeStyle = "rgba(255, 209, 102, 0.42)";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(210, 640, 660, 360);
-
-  ctx.fillStyle = "#ffd166";
-  ctx.font = "bold 60px Verdana";
-  ctx.fillText("Highest Score", 540, 735);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 210px Verdana";
-  ctx.fillText(String(scoreCardHighScore), 540, 875);
+  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
+  ctx.fillRect(160, 620, 760, 340);
+  drawThreeDText(ctx, "Highest Score", 540, 735, "bold 60px Verdana", "#ffd166", "rgba(61, 31, 0, 0.75)", "rgba(255, 209, 102, 0.12)");
+  drawThreeDText(ctx, String(scoreCardHighScore), 540, 875, "bold 210px Verdana", "#ffffff", "rgba(3, 10, 18, 0.82)", "rgba(255, 255, 255, 0.12)");
 
   drawVehicleBadge(ctx, scoreCardVehicle);
 
-  ctx.fillStyle = "#73efff";
-  ctx.font = "bold 44px Verdana";
-  ctx.fillText("Highest Score Vehicle", 540, 1470);
-  drawFittedCenteredText(ctx, prettifyVehicleName(scoreCardVehicle), 540, 1530, 520, 58, 34, "#f7fff7");
+  drawThreeDText(ctx, "Vehicle", 540, 1470, "bold 44px Verdana", "#73efff", "rgba(2, 9, 18, 0.72)", "rgba(115, 239, 255, 0.12)");
+  drawFittedCenteredThreeDText(ctx, prettifyVehicleName(scoreCardVehicle), 540, 1530, 520, 58, 34, "#f7fff7", "rgba(3, 10, 18, 0.72)", "rgba(255, 255, 255, 0.08)");
 
-  ctx.strokeStyle = "rgba(115, 239, 255, 0.7)";
-  ctx.lineWidth = 10;
-  ctx.strokeRect(90, 90, 900, 1740);
+  drawThreeDText(ctx, "Level", 540, 1615, "bold 40px Verdana", "#ffd166", "rgba(61, 31, 0, 0.72)", "rgba(255, 209, 102, 0.1)");
+  drawThreeDText(ctx, `Level ${scoreCardLevel}`, 540, 1688, "bold 64px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.75)", "rgba(255, 255, 255, 0.08)");
 
   return canvas;
 }
