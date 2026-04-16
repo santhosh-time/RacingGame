@@ -2293,13 +2293,7 @@ function updateRoadLines() {
       nextTop = -100;
     }
     line.style.top = `${nextTop}px`;
-
-    if (state.level >= 3) {
-      const curveOffset = Math.sin((nextTop + index * 90 + state.score * 0.08) / 65) * 36;
-      line.style.left = `calc(50% + ${curveOffset}px)`;
-    } else {
-      line.style.left = "50%";
-    }
+    line.style.left = "50%";
   });
 }
 
