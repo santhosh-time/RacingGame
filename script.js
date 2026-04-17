@@ -29,7 +29,7 @@ const gameBounds = {
   roadPadding: 24,
   carWidth: 48,
   bikeWidth: 30,
-  jetWidth: 62,
+  jetWidth: 48,
   birdWidth: 46,
 };
 
@@ -85,8 +85,10 @@ const levelTwoWarmupDurationMs = 5000;
 const levelThreeTargetBaseSpeed = Number((levelOneBaseSpeed * 2).toFixed(2));
 const levelThreeStartSpeed = levelTwoBaseSpeed;
 const levelFourStartScore = 25000;
-const levelFourBaseSpeed = 3.8;
-const levelFourTargetSpeed = 5.6;
+const levelFourBaseSpeed = 9.03;
+const levelFourTargetSpeed = 12.5;
+const levelFourEndScore = 35000;
+const levelFiveStartScore = 35000;
 const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
 const fuelDrainStep = 10;
@@ -150,6 +152,8 @@ const state = {
   pendingPaymentOrderId: "",
   adminUnlocked: false,
   adminSelectedLevel: 1,
+  restartLevel: 1,
+  restartVehicle: "bike-street",
 };
 
 const audioState = {
@@ -157,7 +161,12 @@ const audioState = {
   masterGain: null,
   engineGain: null,
   engineOscillator: null,
+  engineLowpass: null,
   engineStarted: false,
+  waterNoiseSource: null,
+  waterNoiseGain: null,
+  waterFilter: null,
+  waterStarted: false,
   primeNode: null,
 };
 
@@ -186,6 +195,9 @@ function getLivesAwardForLevel(levelNumber = state.level) {
   if (levelNumber === 3) {
     return 1;
   }
+  if (levelNumber === 4) {
+    return 2;
+  }
   return 0;
 }
 
@@ -200,7 +212,7 @@ function updateFuelDisplay() {
     return;
   }
 
-  const showFuel = state.level === 3;
+  const showFuel = state.level >= 3;
   fuelCard.classList.toggle("hidden", !showFuel);
   if (showFuel) {
     fuelDisplay.textContent = `${Math.max(0, Math.round(state.fuelPercent))}%`;
@@ -208,9 +220,9 @@ function updateFuelDisplay() {
 }
 
 function applyLevelTheme() {
-  const levelClass = `level-${state.level}`;
-  document.body.classList.remove("level-1", "level-2", "level-3", "level-4");
-  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4");
+  const levelClass = state.level >= 4 ? "level-4" : `level-${state.level}`;
+  document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
+  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
 }
@@ -1232,6 +1244,25 @@ function updateSessionModeText() {
   }
 }
 
+function isLevelFourVehicleUnlocked() {
+  return state.level >= 4;
+}
+
+function updateVehicleUnlockUI() {
+  const { vehicleOptions } = overlayRefs();
+  const unlocked = isLevelFourVehicleUnlocked();
+
+  vehicleOptions.forEach((option) => {
+    const isLevelFourOnly = option.dataset.levelFourOnly === "true";
+    if (!isLevelFourOnly) {
+      return;
+    }
+
+    option.disabled = !unlocked;
+    option.classList.toggle("is-locked", !unlocked);
+  });
+}
+
 function updateProfileInputs() {
   const {
     profileNameInput,
@@ -1300,6 +1331,7 @@ function showVehicleSetup() {
   updateBestScoreDisplay();
   updateAccessUI();
   updateGuestAccessUI();
+  updateVehicleUnlockUI();
   toggleFeedbackPanel(false);
 }
 
@@ -1457,6 +1489,9 @@ function bindOverlayControls() {
   vehicleOptions.forEach((option) => {
     option.classList.toggle("selected", option.dataset.vehicle === state.selectedVehicle);
     bindElementOnce(option, "VehicleSelect", "click", () => {
+      if (option.disabled) {
+        return;
+      }
       overlayRefs().vehicleOptions.forEach((item) => item.classList.remove("selected"));
       option.classList.add("selected");
       applyVehicleSelection(option.dataset.vehicle);
@@ -1714,9 +1749,12 @@ function prettifyVehicleName(vehicleName = state.selectedVehicle) {
     "car-muscle": "Muscle Car",
     "car-electric": "Electric Car",
     "car-truck": "Truck",
-    "jet-silver": "Silver Private Plane",
-    "jet-gold": "Gold Private Plane",
-    "jet-stealth": "Black Private Plane",
+    "jet-silver": "Small Boat",
+    "jet-gold": "Ship",
+    "jet-stealth": "Yacht",
+    "bird-eagle": "Cargo Ship",
+    "bird-falcon": "Speed Boat",
+    "bird-gull": "Patrol Ship",
   };
 
   return names[vehicleName] || "Racing Vehicle";
@@ -1800,56 +1838,36 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   } else if (isJet) {
     ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(0, -180);
-    ctx.bezierCurveTo(16, -170, 18, -128, 16, -80);
-    ctx.lineTo(26, -28);
-    ctx.lineTo(88, 6);
-    ctx.lineTo(28, 18);
-    ctx.lineTo(22, 54);
-    ctx.lineTo(50, 84);
-    ctx.lineTo(18, 82);
-    ctx.lineTo(12, 134);
-    ctx.lineTo(30, 170);
-    ctx.lineTo(8, 154);
-    ctx.lineTo(0, 186);
-    ctx.lineTo(-8, 154);
-    ctx.lineTo(-30, 170);
-    ctx.lineTo(-12, 134);
-    ctx.lineTo(-18, 82);
-    ctx.lineTo(-50, 84);
-    ctx.lineTo(-22, 54);
-    ctx.lineTo(-28, 18);
-    ctx.lineTo(-88, 6);
-    ctx.lineTo(-26, -28);
-    ctx.lineTo(-16, -80);
+    ctx.moveTo(0, -140);
+    ctx.lineTo(56, -78);
+    ctx.lineTo(90, 26);
+    ctx.lineTo(62, 154);
+    ctx.lineTo(-62, 154);
+    ctx.lineTo(-90, 26);
+    ctx.lineTo(-56, -78);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#eff6ff";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
     ctx.beginPath();
-    ctx.moveTo(0, -136);
-    ctx.lineTo(10, -92);
-    ctx.lineTo(9, 112);
-    ctx.lineTo(0, 150);
-    ctx.lineTo(-9, 112);
-    ctx.lineTo(-10, -92);
+    ctx.roundRect(-28, -34, 56, 92, 16);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "rgba(17, 30, 43, 0.22)";
-    ctx.fillRect(-7, -62, 14, 186);
+    ctx.fillStyle = "rgba(18, 33, 46, 0.22)";
+    ctx.fillRect(-6, -82, 12, 186);
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
     ctx.beginPath();
-    ctx.roundRect(-6, -122, 12, 48, 6);
+    ctx.roundRect(-8, -110, 16, 44, 6);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
     ctx.beginPath();
-    ctx.moveTo(-62, 4);
-    ctx.lineTo(62, 4);
-    ctx.lineTo(18, 24);
-    ctx.lineTo(-18, 24);
+    ctx.moveTo(-44, 66);
+    ctx.lineTo(44, 66);
+    ctx.lineTo(28, 100);
+    ctx.lineTo(-28, 100);
     ctx.closePath();
     ctx.fill();
   } else {
@@ -1918,6 +1936,123 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   ctx.restore();
 }
 
+function drawScoreCardBackground(ctx, levelNumber, width, height) {
+  ctx.clearRect(0, 0, width, height);
+
+  if (levelNumber === 2) {
+    const muddyGradient = ctx.createLinearGradient(0, 0, 0, height);
+    muddyGradient.addColorStop(0, "#5b4333");
+    muddyGradient.addColorStop(0.56, "#3d2c22");
+    muddyGradient.addColorStop(1, "#17110d");
+    ctx.fillStyle = muddyGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(205, 182, 159, 0.09)";
+    for (let index = 0; index < 9; index += 1) {
+      ctx.beginPath();
+      ctx.ellipse(160 + index * 110, 320 + index * 150, 170, 48, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(111, 78, 55, 0.24)";
+    ctx.fillRect(160, 0, 760, height);
+    ctx.strokeStyle = "rgba(237, 221, 199, 0.42)";
+    ctx.lineWidth = 18;
+    ctx.strokeRect(166, -2, 748, height + 4);
+    return;
+  }
+
+  if (levelNumber === 3) {
+    const skylineGradient = ctx.createLinearGradient(0, 0, 0, height);
+    skylineGradient.addColorStop(0, "#17365c");
+    skylineGradient.addColorStop(0.42, "#0c2038");
+    skylineGradient.addColorStop(1, "#050d18");
+    ctx.fillStyle = skylineGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(120, 194, 255, 0.12)";
+    ctx.fillRect(0, 0, width, 360);
+
+    ctx.fillStyle = "rgba(71, 110, 148, 0.45)";
+    const buildingHeights = [520, 700, 620, 860, 590, 760, 640, 820];
+    buildingHeights.forEach((buildingHeight, index) => {
+      const x = 40 + index * 130;
+      ctx.fillRect(x, height - buildingHeight - 120, 96, buildingHeight);
+      ctx.fillStyle = "rgba(201, 233, 255, 0.18)";
+      for (let row = 0; row < 11; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+          ctx.fillRect(x + 12 + column * 24, height - buildingHeight - 96 + row * 42, 10, 18);
+        }
+      }
+      ctx.fillStyle = "rgba(71, 110, 148, 0.45)";
+    });
+
+    ctx.fillStyle = "rgba(78, 179, 98, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(220, height - 40, 240, 90, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(860, height - 28, 280, 100, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (levelNumber >= 4) {
+    const waterGradient = ctx.createLinearGradient(0, 0, 0, height);
+    waterGradient.addColorStop(0, "#2aa1d4");
+    waterGradient.addColorStop(0.2, "#1488c2");
+    waterGradient.addColorStop(0.58, "#0d679f");
+    waterGradient.addColorStop(1, "#09476f");
+    ctx.fillStyle = waterGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.beginPath();
+    ctx.ellipse(220, 140, 180, 44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(780, 180, 240, 56, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = 8;
+    for (let index = 0; index < 13; index += 1) {
+      const y = 280 + index * 120;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.bezierCurveTo(220, y - 26, 480, y + 26, width, y - 8);
+      ctx.stroke();
+    }
+    return;
+  }
+
+  const roadGradient = ctx.createLinearGradient(0, 0, 0, height);
+  roadGradient.addColorStop(0, "#0f2746");
+  roadGradient.addColorStop(1, "#050b14");
+  ctx.fillStyle = roadGradient;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(255, 209, 102, 0.08)";
+  ctx.beginPath();
+  ctx.arc(860, 260, 260, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(16, 23, 32, 0.38)";
+  ctx.fillRect(160, 0, 760, height);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+  ctx.lineWidth = 16;
+  ctx.strokeRect(168, -2, 744, height + 4);
+
+  ctx.setLineDash([56, 46]);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.moveTo(width / 2, 0);
+  ctx.lineTo(width / 2, height);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function createScoreCardImage() {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -1927,16 +2062,7 @@ function createScoreCardImage() {
   const scoreCardVehicle = state.bestScoreVehicle || state.selectedVehicle;
   const scoreCardLevel = Math.max(1, Number(state.bestScoreLevel) || 1);
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#0f2746");
-  gradient.addColorStop(1, "#050b14");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "rgba(255, 209, 102, 0.08)";
-  ctx.beginPath();
-  ctx.arc(860, 260, 260, 0, Math.PI * 2);
-  ctx.fill();
+  drawScoreCardBackground(ctx, scoreCardLevel, canvas.width, canvas.height);
 
   ctx.fillStyle = "rgba(7, 17, 28, 0.54)";
   ctx.fillRect(40, 40, 1000, 1840);
@@ -2058,6 +2184,18 @@ async function primeMobileAudio() {
   audioState.primeNode = true;
 }
 
+function createNoiseBuffer(context, durationSeconds = 2.5) {
+  const frameCount = Math.floor(context.sampleRate * durationSeconds);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const channelData = buffer.getChannelData(0);
+
+  for (let index = 0; index < frameCount; index += 1) {
+    channelData[index] = Math.random() * 2 - 1;
+  }
+
+  return buffer;
+}
+
 function engineSoundProfile(vehicleName) {
   const profiles = {
     "bike-street": { wave: "sawtooth", baseFrequency: 126, steerBoost: 12, activeGain: 0.065, speedFactor: 10.5 },
@@ -2068,6 +2206,9 @@ function engineSoundProfile(vehicleName) {
     "car-muscle": { wave: "square", baseFrequency: 78, steerBoost: 8, activeGain: 0.075, speedFactor: 8.3 },
     "car-electric": { wave: "triangle", baseFrequency: 146, steerBoost: 6, activeGain: 0.046, speedFactor: 7.2 },
     "car-truck": { wave: "square", baseFrequency: 62, steerBoost: 5, activeGain: 0.082, speedFactor: 6.5 },
+    "jet-silver": { wave: "sawtooth", baseFrequency: 54, steerBoost: 3, activeGain: 0.052, speedFactor: 4.1, lowpass: 520 },
+    "jet-gold": { wave: "square", baseFrequency: 48, steerBoost: 2, activeGain: 0.058, speedFactor: 3.7, lowpass: 420 },
+    "jet-stealth": { wave: "triangle", baseFrequency: 60, steerBoost: 2, activeGain: 0.048, speedFactor: 4.5, lowpass: 680 },
   };
 
   return profiles[vehicleName] || profiles["car-sport"];
@@ -2086,15 +2227,20 @@ async function startEngineSound() {
   const profile = engineSoundProfile(state.selectedVehicle);
   const oscillator = context.createOscillator();
   const gainNode = context.createGain();
+  const lowpass = context.createBiquadFilter();
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = profile.lowpass || 1600;
   oscillator.type = profile.wave;
   oscillator.frequency.value = profile.baseFrequency;
   gainNode.gain.value = 0.0001;
-  oscillator.connect(gainNode);
+  oscillator.connect(lowpass);
+  lowpass.connect(gainNode);
   gainNode.connect(audioState.masterGain);
   oscillator.start();
 
   audioState.engineOscillator = oscillator;
   audioState.engineGain = gainNode;
+  audioState.engineLowpass = lowpass;
   audioState.engineStarted = true;
 }
 
@@ -2121,8 +2267,70 @@ function updateEngineSound() {
 
   audioState.engineOscillator.frequency.cancelScheduledValues(now);
   audioState.engineOscillator.frequency.linearRampToValueAtTime(targetFrequency, now + 0.08);
+  if (audioState.engineLowpass) {
+    audioState.engineLowpass.frequency.cancelScheduledValues(now);
+    audioState.engineLowpass.frequency.linearRampToValueAtTime(profile.lowpass || 1600, now + 0.08);
+  }
   audioState.engineGain.gain.cancelScheduledValues(now);
   audioState.engineGain.gain.setTargetAtTime(targetGain, now, 0.08);
+}
+
+async function startWaterSound() {
+  if (!state.soundEnabled || state.level < 4) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context || audioState.waterStarted) {
+    return;
+  }
+
+  const noiseSource = context.createBufferSource();
+  noiseSource.buffer = createNoiseBuffer(context);
+  noiseSource.loop = true;
+
+  const filter = context.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 420;
+  filter.Q.value = 0.4;
+
+  const gainNode = context.createGain();
+  gainNode.gain.value = 0.0001;
+
+  noiseSource.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  noiseSource.start();
+
+  audioState.waterNoiseSource = noiseSource;
+  audioState.waterFilter = filter;
+  audioState.waterNoiseGain = gainNode;
+  audioState.waterStarted = true;
+}
+
+function stopWaterSound() {
+  if (!audioState.waterStarted || !audioState.waterNoiseGain || !audioState.context) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  audioState.waterNoiseGain.gain.cancelScheduledValues(now);
+  audioState.waterNoiseGain.gain.setTargetAtTime(0.0001, now, 0.08);
+}
+
+function updateWaterSound() {
+  if (!audioState.waterStarted || !state.soundEnabled || !audioState.context || !audioState.waterNoiseGain || !audioState.waterFilter) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  const targetGain = state.active && state.level === 4 ? 0.03 : 0.0001;
+  const targetFrequency = 340 + state.currentSpeed * 18;
+
+  audioState.waterFilter.frequency.cancelScheduledValues(now);
+  audioState.waterFilter.frequency.linearRampToValueAtTime(targetFrequency, now + 0.12);
+  audioState.waterNoiseGain.gain.cancelScheduledValues(now);
+  audioState.waterNoiseGain.gain.setTargetAtTime(targetGain, now, 0.12);
 }
 
 async function playToneSweep(options) {
@@ -2205,12 +2413,17 @@ function enemyVehicleWidth(vehicleName) {
   return gameBounds.carWidth;
 }
 
+function updatePlayerVerticalPosition() {
+  playerCar.style.top = "auto";
+  playerCar.style.bottom = "18px";
+}
+
 function barricadeWidth() {
   return 56;
 }
 
 function pickEnemyVehicle() {
-  const poolSource = state.level === 4 ? birdEnemyChoices : roadEnemyVehicleChoices;
+  const poolSource = state.level >= 4 ? birdEnemyChoices : roadEnemyVehicleChoices;
   const choices = poolSource.filter((vehicleName) => vehicleName !== state.selectedVehicle);
   const pool = choices.length > 0 ? choices : poolSource;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -2249,7 +2462,7 @@ function positionsOverlap(leftA, widthA, leftB, widthB, gap = 18) {
 }
 
 function chooseEnemyX(excludedXs = [], preferPlayerX = false) {
-  const width = state.level === 4 ? gameBounds.birdWidth : gameBounds.carWidth;
+  const width = state.level >= 4 ? gameBounds.birdWidth : gameBounds.carWidth;
   const playerTargetX = clampVehicleLeft(playerCenterX() - width / 2, width);
 
   if (preferPlayerX) {
@@ -2319,8 +2532,7 @@ function applyVehicleSelection(vehicleName) {
   state.selectedVehicle = vehicleName;
   playerCar.classList.remove(...vehicleClasses);
   playerCar.classList.add(vehicleName);
-  playerCar.style.top = "auto";
-  playerCar.style.bottom = "18px";
+  updatePlayerVerticalPosition();
 
   if (!state.active) {
     state.playerX = middleLaneX();
@@ -2387,8 +2599,8 @@ function chooseBarricadeX(excludedXs = []) {
 
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
-  const spawnCount = state.level === 4 ? 2 : 3;
-  const spawnTops = state.level === 4 ? [-120, -360] : [-160, -360, -560];
+  const spawnCount = state.level >= 4 ? 2 : 3;
+  const spawnTops = state.level >= 4 ? [-120, -360] : [-160, -360, -560];
   const lanes = [];
 
   for (let index = 0; index < spawnCount; index += 1) {
@@ -2433,10 +2645,6 @@ function spawnBarricades() {
 
 function spawnBooster() {
   if (state.pickup) {
-    return;
-  }
-
-  if (state.level >= 4) {
     return;
   }
 
@@ -2524,6 +2732,10 @@ function updateSpeedRamp() {
     const progress = Math.max(0, Math.min(1, (state.score - state.levelStartScore) / scoreSpan));
     state.baseSpeedTarget = levelTwoBaseSpeed + (levelTwoTargetSpeed - levelTwoBaseSpeed) * progress;
   } else if (state.level === 4) {
+    const scoreSpan = Math.max(1, levelFourEndScore - state.levelStartScore);
+    const progress = Math.max(0, Math.min(1, (state.score - state.levelStartScore) / scoreSpan));
+    state.baseSpeedTarget = levelFourBaseSpeed + (levelFourTargetSpeed - levelFourBaseSpeed) * progress;
+  } else if (state.level >= 5) {
     state.baseSpeedTarget = levelFourTargetSpeed;
   }
 
@@ -2571,7 +2783,7 @@ function increaseFuel(amount) {
 }
 
 function handleFuelDrain() {
-  if (state.level !== 3) {
+  if (state.level < 3) {
     return;
   }
 
@@ -2614,21 +2826,21 @@ function showLevelFourSelection() {
     <div class="level-four-panel">
       <p class="countdown-eyebrow">Congratulations</p>
       <h2>Welcome To Level 4</h2>
-      <p>You are heading into the sky and unlocking private planes. Choose your plane to begin the air race.</p>
+      <p>You are entering open water. Choose your boat to begin the next race.</p>
       <div class="vehicle-group level-four-group">
-        <h3>Private Planes</h3>
+        <h3>Choose Your Boat</h3>
         <div class="vehicle-grid jet-grid">
           <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
             <span class="vehicle-preview jet-preview jet-silver"></span>
-            <span>Silver Private Plane</span>
+            <span>Small Boat</span>
           </button>
           <button class="vehicle-option jet-select-option" data-jet="jet-gold" type="button">
             <span class="vehicle-preview jet-preview jet-gold"></span>
-            <span>Gold Private Plane</span>
+            <span>Ship</span>
           </button>
           <button class="vehicle-option jet-select-option" data-jet="jet-stealth" type="button">
             <span class="vehicle-preview jet-preview jet-stealth"></span>
-            <span>Black Private Plane</span>
+            <span>Yacht</span>
           </button>
         </div>
       </div>
@@ -2653,6 +2865,7 @@ async function beginLevel(levelNumber) {
   state.active = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
+  stopWaterSound();
 
   const title = levelNumber === 1 ? "Level 1 Starts" : `Entering Level ${levelNumber}`;
   const subtitle = levelNumber === 1
@@ -2661,7 +2874,9 @@ async function beginLevel(levelNumber) {
       ? "Muddy roads ahead. Laser mode incoming."
       : levelNumber === 3
         ? "Skyline sprint. Watch your fuel."
-        : "Take off into the clouds. Birds ahead.";
+        : levelNumber === 4
+          ? "Ride the open water. Ships ahead."
+          : "Level 5 begins. Keep the water run alive.";
 
   await showCountdownOverlay(title, subtitle);
 
@@ -2674,6 +2889,7 @@ async function beginLevel(levelNumber) {
   }
   updateLevelDisplay();
   updateLivesDisplay();
+  updateVehicleUnlockUI();
   applyLevelTheme();
 
   if (levelNumber === 1) {
@@ -2707,9 +2923,11 @@ async function beginLevel(levelNumber) {
       state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
       state.fuelPercent = 100;
     } else {
-      state.baseSpeed = levelFourBaseSpeed;
+      state.baseSpeed = levelNumber === 4 ? levelFourBaseSpeed : levelFourTargetSpeed;
       state.baseSpeedTarget = levelFourTargetSpeed;
-      state.fuelPercent = 100;
+      state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
+      state.nextFuelScore = Math.max(state.score + 700, state.nextFuelScore);
+      state.nextFuelDrainScore = Math.max(state.score + 1000, state.nextFuelDrainScore);
       clearBooster();
     }
   }
@@ -2717,9 +2935,14 @@ async function beginLevel(levelNumber) {
   clearBarricades();
   resetEnemies();
   state.playerX = middleLaneX();
+  updatePlayerVerticalPosition();
   refreshSpeed();
   await primeMobileAudio();
   await startEngineSound();
+  if (levelNumber >= 4) {
+    await startWaterSound();
+  }
+  updateWaterSound();
   state.active = true;
   state.pendingTransition = false;
   gameLoop();
@@ -2734,6 +2957,9 @@ function adminLevelStartScore(levelNumber) {
   }
   if (levelNumber === 4) {
     return levelFourStartScore;
+  }
+  if (levelNumber === 5) {
+    return levelFiveStartScore;
   }
   return 0;
 }
@@ -2765,6 +2991,8 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
   state.enemyRespawns = 0;
+  state.restartLevel = levelNumber;
+  state.restartVehicle = state.selectedVehicle;
 
   roadLines.forEach((line, index) => {
     line.style.top = `${20 + index * 160}px`;
@@ -2804,12 +3032,16 @@ async function startAdminLevel() {
   const levelNumber = state.adminSelectedLevel;
   const startScore = adminLevelStartScore(levelNumber);
 
-  if (levelNumber === 4 && !state.selectedVehicle.startsWith("jet-")) {
-    applyVehicleSelection("jet-silver");
-  }
-
   toggleAdminPanel(false);
   updateCloudStatus(`Admin jump ready. Launching Level ${levelNumber}.`, true);
+
+  if (levelNumber === 4) {
+    const selectedBoat = await showLevelFourSelection();
+    applyVehicleSelection(selectedBoat || "jet-silver");
+    await initializeRun(levelNumber, startScore);
+    return;
+  }
+
   await initializeRun(levelNumber, startScore);
 }
 
@@ -2848,8 +3080,8 @@ async function handleVehicleCrash() {
     return;
   }
 
-  if (state.level === 4) {
-    endGame("Bird strike!");
+  if (state.level >= 4) {
+    endGame("Shipwreck!");
     return;
   }
 
@@ -2869,7 +3101,7 @@ async function handleVehicleCrash() {
     playCrashSound();
     message.innerHTML = `
       <div class="countdown-panel">
-        <p class="countdown-eyebrow">Lifeline Used</p>
+        <p class="countdown-eyebrow">Life Used</p>
         <h2>${state.livesRemaining}</h2>
         <p>${state.livesRemaining === 1 ? "1 life remaining." : `${state.livesRemaining} lives remaining.`}</p>
       </div>
@@ -2878,8 +3110,8 @@ async function handleVehicleCrash() {
     syncVehiclePreviewVisibility();
     updateCloudStatus(
       state.livesRemaining === 1
-        ? `${state.racerName}, lifeline used. 1 life remaining.`
-        : `${state.racerName}, lifeline used. ${state.livesRemaining} lives remaining.`,
+        ? `${state.racerName}, life used. 1 life remaining.`
+        : `${state.racerName}, life used. ${state.livesRemaining} lives remaining.`,
       false,
     );
     await new Promise((resolve) => window.setTimeout(resolve, 1100));
@@ -2890,6 +3122,10 @@ async function handleVehicleCrash() {
     state.invincibleUntil = Date.now() + 1800;
     await primeMobileAudio();
     await startEngineSound();
+    if (state.level >= 4) {
+      await startWaterSound();
+    }
+    updateWaterSound();
     state.active = true;
     state.pendingTransition = false;
     state.reviveRunning = false;
@@ -2933,8 +3169,8 @@ function updateEnemies() {
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
     const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
-    const respawnTop = state.level === 4 ? -140 : -220;
-    const movementStep = state.level === 4
+    const respawnTop = state.level >= 4 ? -140 : -220;
+    const movementStep = state.level >= 4
       ? Math.max(2.2, state.currentSpeed * 0.58)
       : state.currentSpeed + 1.2;
     let nextTop = top + movementStep;
@@ -2948,7 +3184,7 @@ function updateEnemies() {
           left: parseFloat(item.style.left),
           width: enemyVehicleWidth(item.dataset.vehicle || "car-sport"),
         }));
-      const forcePlayerLane = state.level === 4 ? Math.random() < 0.22 : state.enemyRespawns % 2 === 0;
+      const forcePlayerLane = state.level >= 4 ? Math.random() < 0.22 : state.enemyRespawns % 2 === 0;
       const nextLane = chooseEnemyX(
         occupiedLanes.map((item) => item.left),
         forcePlayerLane
@@ -3080,6 +3316,7 @@ async function gameLoop() {
   updateBooster();
   updateLaserPointer();
   updateEngineSound();
+  updateWaterSound();
 
   state.score += 1;
   handleFuelDrain();
@@ -3100,6 +3337,7 @@ async function gameLoop() {
     state.active = false;
     cancelAnimationFrame(state.animationId);
     stopEngineSound();
+    stopWaterSound();
     clearBooster();
     const selectedJet = await showLevelFourSelection();
     applyVehicleSelection(selectedJet || "jet-silver");
@@ -3107,8 +3345,12 @@ async function gameLoop() {
     return;
   }
 
+  if (state.level === 4 && state.score >= levelFiveStartScore && !state.pendingTransition) {
+    await beginLevel(5);
+    return;
+  }
+
   if (state.level >= 4) {
-    clearBooster();
     clearBarricades();
   }
 
@@ -3151,14 +3393,24 @@ async function startGame() {
     }
     updateGuestAccessUI();
   }
-  await initializeRun(1, 0);
+
+  const restartingExistingRun = startButton.textContent === "Restart Game";
+  const targetLevel = restartingExistingRun ? Math.max(1, state.restartLevel || 1) : 1;
+  const targetScore = restartingExistingRun ? adminLevelStartScore(targetLevel) : 0;
+  const targetVehicle = restartingExistingRun ? (state.restartVehicle || state.selectedVehicle) : state.selectedVehicle;
+
+  applyVehicleSelection(targetVehicle);
+  await initializeRun(targetLevel, targetScore);
 }
 
 function endGame(title = "Crash!") {
   state.active = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
+  stopWaterSound();
   playCrashSound();
+  state.restartLevel = state.level;
+  state.restartVehicle = state.selectedVehicle;
   maybeUpdateBestScore();
   message.innerHTML = `
     <div class="game-over-panel">
@@ -3223,9 +3475,14 @@ soundButton.addEventListener("click", async () => {
 
   if (state.soundEnabled) {
     await startEngineSound();
+    if (state.level >= 4) {
+      await startWaterSound();
+    }
     updateEngineSound();
+    updateWaterSound();
   } else {
     stopEngineSound();
+    stopWaterSound();
   }
 });
 
@@ -3282,7 +3539,11 @@ touchTapButtons.forEach((button) => {
 
     if (state.soundEnabled && state.active) {
       startEngineSound();
+      if (state.level >= 4) {
+        startWaterSound();
+      }
       updateEngineSound();
+      updateWaterSound();
     }
   }, { passive: true });
 });

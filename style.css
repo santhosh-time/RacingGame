@@ -43,9 +43,9 @@ body.level-3 {
 
 body.level-4 {
   background:
-    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.74), transparent 18%),
-    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.68), transparent 20%),
-    linear-gradient(180deg, #d7f1ff, #8dceff 46%, #337ed0 100%);
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.18), transparent 18%),
+    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.14), transparent 20%),
+    linear-gradient(180deg, #1f5d89, #1672a7 36%, #0b4b79 68%, #083659 100%);
 }
 
 .app {
@@ -188,17 +188,83 @@ body.level-4 {
 
 .game-area.level-4 {
   background:
-    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.92) 0 7%, rgba(255, 255, 255, 0) 8%),
-    radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.88) 0 9%, rgba(255, 255, 255, 0) 10%),
-    radial-gradient(circle at 72% 16%, rgba(255, 255, 255, 0.86) 0 8%, rgba(255, 255, 255, 0) 9%),
-    radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.82) 0 10%, rgba(255, 255, 255, 0) 11%),
-    linear-gradient(180deg, #9fd5ff 0 32%, #63b6ff 32% 68%, #2f88db 68% 100%);
-  border-left-color: #ecf7ff;
-  border-right-color: #ecf7ff;
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.08), transparent 20%),
+    linear-gradient(180deg, #2aa1d4 0 16%, #1488c2 16% 42%, #0d679f 42% 72%, #09476f 72% 100%);
+  border-left-color: #b7e4ff;
+  border-right-color: #b7e4ff;
 }
 
 .game-area.level-4 .road-line {
   opacity: 0;
+}
+
+.game-area.level-4::before,
+.game-area.level-4::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.game-area.level-4::before {
+  background:
+    radial-gradient(120% 18% at 10% 12%, rgba(255, 255, 255, 0.16) 0 18%, transparent 19%),
+    radial-gradient(120% 16% at 62% 26%, rgba(255, 255, 255, 0.12) 0 16%, transparent 17%),
+    radial-gradient(120% 14% at 18% 44%, rgba(255, 255, 255, 0.1) 0 14%, transparent 15%),
+    radial-gradient(120% 14% at 74% 62%, rgba(255, 255, 255, 0.09) 0 14%, transparent 15%),
+    radial-gradient(120% 12% at 28% 82%, rgba(255, 255, 255, 0.08) 0 12%, transparent 13%);
+  background-size: 200% 100%;
+  opacity: 0.95;
+  animation: waterDrift 9s linear infinite;
+}
+
+.game-area.level-4::after {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0 2px,
+      rgba(255, 255, 255, 0.02) 2px 14px,
+      rgba(7, 74, 116, 0.08) 14px 28px
+    );
+  background-size: 100% 220px;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: waterRipple 3.8s linear infinite;
+}
+
+.game-area.level-4 .vehicle,
+.game-area.level-4 .pickup,
+.game-area.level-4 .barricade,
+.game-area.level-4 .laser-pointer {
+  z-index: 2;
+}
+
+.game-area.level-4 .message,
+.game-area.level-4 .welcome-modal {
+  z-index: 3;
+}
+
+@keyframes waterDrift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 220px 0;
+  }
+}
+
+@keyframes waterRipple {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .welcome-modal {
@@ -319,18 +385,18 @@ body.level-4 {
 
 .player-vehicle[class*="jet-"],
 .jet-preview {
-  width: 62px;
-  height: 118px;
+  width: 48px;
+  height: 88px;
 }
 
 .player-vehicle[class*="jet-"] {
-  bottom: -12px;
+  bottom: 18px;
 }
 
 .enemy-vehicle[class*="bird-"],
 .bird-preview {
-  width: 46px;
-  height: 64px;
+  width: 48px;
+  height: 88px;
 }
 
 .bike-street {
@@ -368,74 +434,41 @@ body.level-4 {
 .jet-silver,
 .jet-gold,
 .jet-stealth {
-  position: relative;
-  clip-path: polygon(50% 0%, 56% 8%, 57% 32%, 92% 40%, 58% 48%, 56% 78%, 68% 100%, 50% 88%, 32% 100%, 44% 78%, 42% 48%, 8% 40%, 43% 32%, 44% 8%);
-  box-shadow: 0 10px 18px rgba(10, 18, 28, 0.24);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .jet-silver {
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.54) 0 12%, transparent 12% 88%, rgba(255, 255, 255, 0.2) 88% 100%),
-    linear-gradient(180deg, #fafdff 0 16%, #edf4fb 16% 34%, #bfd5ea 34% 64%, #6d8da9 64% 100%);
+  background-image: url("assets/boat-small.svg");
 }
 
 .jet-gold {
-  background:
-    linear-gradient(90deg, rgba(255, 248, 214, 0.5) 0 12%, transparent 12% 88%, rgba(255, 255, 255, 0.18) 88% 100%),
-    linear-gradient(180deg, #fff9e4 0 16%, #ffefba 16% 34%, #f4cb67 34% 64%, #b57a1c 64% 100%);
+  background-image: url("assets/boat-ship.svg");
 }
 
 .jet-stealth {
-  background:
-    linear-gradient(90deg, rgba(230, 238, 247, 0.24) 0 12%, transparent 12% 88%, rgba(255, 255, 255, 0.08) 88% 100%),
-    linear-gradient(180deg, #e5ebf2 0 16%, #c0c9d5 16% 34%, #7d8998 34% 64%, #2b3440 64% 100%);
-}
-
-.jet-silver::before,
-.jet-gold::before,
-.jet-stealth::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 11%;
-  width: 16%;
-  height: 66%;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 255, 0.22));
-}
-
-.jet-silver::after,
-.jet-gold::after,
-.jet-stealth::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  width: 72%;
-  height: 16%;
-  transform: translateX(-50%);
-  clip-path: polygon(0 54%, 24% 22%, 76% 22%, 100% 54%, 76% 78%, 24% 78%);
-  background: rgba(255, 255, 255, 0.28);
+  background-image: url("assets/boat-yacht.svg");
 }
 
 .bird-eagle,
 .bird-falcon,
 .bird-gull {
-  box-shadow: 0 8px 14px rgba(18, 23, 30, 0.16);
-  clip-path: polygon(50% 18%, 70% 0%, 90% 20%, 100% 44%, 72% 34%, 58% 48%, 60% 100%, 40% 100%, 42% 48%, 28% 34%, 0% 44%, 10% 20%, 30% 0%);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .bird-eagle {
-  background: linear-gradient(180deg, #f2e1b1 0 24%, #7d5629 24% 100%);
+  background-image: url("assets/enemy-ship-cargo.svg");
 }
 
 .bird-falcon {
-  background: linear-gradient(180deg, #f0f3f8 0 20%, #7c8fa8 20% 100%);
+  background-image: url("assets/enemy-ship-speed.svg");
 }
 
 .bird-gull {
-  background: linear-gradient(180deg, #ffffff 0 24%, #b8c4d3 24% 100%);
+  background-image: url("assets/enemy-ship-patrol.svg");
 }
 
 .pickup {
@@ -1038,6 +1071,19 @@ body.level-4 {
   border-color: rgba(255, 209, 102, 0.9);
   background: rgba(255, 209, 102, 0.12);
   box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.3);
+}
+
+.vehicle-option.is-locked {
+  opacity: 0.45;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+
+.vehicle-option.is-locked::after {
+  content: "Locked Until Level 4";
+  font-size: 0.7rem;
+  color: #ffd166;
+  letter-spacing: 0.04em;
 }
 
 .vehicle-preview {
