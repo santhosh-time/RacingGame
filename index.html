@@ -199,6 +199,36 @@
               </div>
               <p id="feedbackStatus" class="auth-status">Your feedback helps us tune the next ride.</p>
             </div>
+            <div class="admin-launch-row">
+              <button id="adminToggleButton" class="admin-icon-button" type="button" aria-label="Admin access">A</button>
+            </div>
+            <div id="adminPanel" class="admin-panel hidden">
+              <p class="admin-title">Admin Access</p>
+              <div id="adminLoginSection" class="admin-login-section">
+                <label class="field">
+                  <span>Admin Code</span>
+                  <input id="adminPasswordInput" type="password" maxlength="24" placeholder="Enter admin code" autocomplete="off">
+                </label>
+                <div class="auth-actions compact">
+                  <button id="adminUnlockButton" class="auth-button primary" type="button">Unlock Admin</button>
+                  <button id="adminCloseButton" class="auth-button secondary" type="button">Close</button>
+                </div>
+              </div>
+              <div id="adminLevelSection" class="admin-level-section hidden">
+                <p class="admin-intro">Choose the level you want to test directly.</p>
+                <div class="admin-level-grid">
+                  <button class="admin-level-button selected" data-admin-level="1" type="button">Level 1</button>
+                  <button class="admin-level-button" data-admin-level="2" type="button">Level 2</button>
+                  <button class="admin-level-button" data-admin-level="3" type="button">Level 3</button>
+                  <button class="admin-level-button" data-admin-level="4" type="button">Level 4</button>
+                </div>
+                <div class="auth-actions compact">
+                  <button id="adminPlayButton" class="auth-button primary" type="button">Play Selected Level</button>
+                  <button id="adminLockButton" class="auth-button secondary" type="button">Close</button>
+                </div>
+              </div>
+              <p id="adminStatus" class="auth-status">Admin level jump is for local testing.</p>
+            </div>
           </div>
         </div>
       </div>

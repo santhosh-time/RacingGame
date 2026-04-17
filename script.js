@@ -73,6 +73,8 @@ const guestRunLimit = 3;
 const guestRunsStorageKey = "viral-racing-guest-runs";
 const guestUnlimitedSessionKey = "viral-racing-guest-unlimited";
 const guestUnlimitedCouponCode = "urinfinity";
+const adminSessionKey = "viral-racing-admin";
+const adminAccessCode = "viraladmin";
 const accessWindowHours = 24;
 const maxAccessHours = 48;
 const levelOneBaseSpeed = 4.8;
@@ -146,6 +148,8 @@ const state = {
   accessValidUntil: "",
   accessBusy: false,
   pendingPaymentOrderId: "",
+  adminUnlocked: false,
+  adminSelectedLevel: 1,
 };
 
 const audioState = {
@@ -249,6 +253,17 @@ function overlayRefs() {
     feedbackStatus: document.getElementById("feedbackStatus"),
     sendFeedbackButton: document.getElementById("sendFeedbackButton"),
     cancelFeedbackButton: document.getElementById("cancelFeedbackButton"),
+    adminToggleButton: document.getElementById("adminToggleButton"),
+    adminPanel: document.getElementById("adminPanel"),
+    adminLoginSection: document.getElementById("adminLoginSection"),
+    adminLevelSection: document.getElementById("adminLevelSection"),
+    adminPasswordInput: document.getElementById("adminPasswordInput"),
+    adminUnlockButton: document.getElementById("adminUnlockButton"),
+    adminCloseButton: document.getElementById("adminCloseButton"),
+    adminLevelButtons: Array.from(document.querySelectorAll(".admin-level-button")),
+    adminPlayButton: document.getElementById("adminPlayButton"),
+    adminLockButton: document.getElementById("adminLockButton"),
+    adminStatus: document.getElementById("adminStatus"),
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
@@ -350,6 +365,27 @@ function setUnlimitedGuestAccess(enabled) {
   }
 }
 
+function hasAdminAccess() {
+  try {
+    return window.sessionStorage.getItem(adminSessionKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setAdminAccess(enabled) {
+  try {
+    if (enabled) {
+      window.sessionStorage.setItem(adminSessionKey, "true");
+    } else {
+      window.sessionStorage.removeItem(adminSessionKey);
+    }
+  } catch {
+    // Keep local admin testing available only when storage works.
+  }
+  state.adminUnlocked = enabled;
+}
+
 function isGuestLimitReached() {
   if (hasUnlimitedGuestAccess()) {
     return false;
@@ -446,6 +482,83 @@ function updateFeedbackStatus(messageText, isReady = false) {
 
   feedbackStatus.textContent = messageText;
   feedbackStatus.classList.toggle("is-connected", isReady);
+}
+
+function updateAdminStatus(messageText, isReady = false) {
+  const { adminStatus } = overlayRefs();
+  if (!adminStatus) {
+    return;
+  }
+
+  adminStatus.textContent = messageText;
+  adminStatus.classList.toggle("is-connected", isReady);
+}
+
+function updateAdminUI() {
+  const {
+    adminPanel,
+    adminLoginSection,
+    adminLevelSection,
+    adminPasswordInput,
+    adminLevelButtons,
+  } = overlayRefs();
+
+  if (!adminPanel) {
+    return;
+  }
+
+  adminLoginSection?.classList.toggle("hidden", state.adminUnlocked);
+  adminLevelSection?.classList.toggle("hidden", !state.adminUnlocked);
+
+  adminLevelButtons.forEach((button) => {
+    button.classList.toggle("selected", Number(button.dataset.adminLevel) === state.adminSelectedLevel);
+  });
+
+  if (!state.adminUnlocked && adminPasswordInput) {
+    adminPasswordInput.value = "";
+    updateAdminStatus("Admin level jump is for local testing.", false);
+  } else {
+    updateAdminStatus(`Admin ready. Level ${state.adminSelectedLevel} is selected.`, true);
+  }
+}
+
+function toggleAdminPanel(showPanel) {
+  const { adminPanel, adminPasswordInput } = overlayRefs();
+  if (!adminPanel) {
+    return;
+  }
+
+  adminPanel.classList.toggle("hidden", !showPanel);
+  updateAdminUI();
+  if (showPanel && !state.adminUnlocked) {
+    adminPasswordInput?.focus();
+  }
+}
+
+function unlockAdminMode() {
+  const { adminPasswordInput } = overlayRefs();
+  const enteredCode = adminPasswordInput?.value?.trim() || "";
+
+  if (!enteredCode) {
+    updateAdminStatus("Enter the admin code to unlock level jump.", false);
+    return;
+  }
+
+  if (enteredCode !== adminAccessCode) {
+    updateAdminStatus("That admin code did not match.", false);
+    return;
+  }
+
+  setAdminAccess(true);
+  updateAdminUI();
+}
+
+function closeAdminPanel() {
+  toggleAdminPanel(false);
+}
+
+function lockAdminPanel() {
+  toggleAdminPanel(false);
 }
 
 function formatAccessExpiry(value) {
@@ -1332,6 +1445,13 @@ function bindOverlayControls() {
     cancelFeedbackButton,
     payAccessButton,
     refreshAccessButton,
+    adminToggleButton,
+    adminPasswordInput,
+    adminUnlockButton,
+    adminCloseButton,
+    adminLevelButtons,
+    adminPlayButton,
+    adminLockButton,
   } = overlayRefs();
 
   vehicleOptions.forEach((option) => {
@@ -1461,6 +1581,45 @@ function bindOverlayControls() {
     bindElementOnce(refreshAccessButton, "RefreshAccessClick", "click", loadAccessPass);
   }
 
+  if (adminToggleButton) {
+    bindElementOnce(adminToggleButton, "AdminToggleClick", "click", () => {
+      const { adminPanel } = overlayRefs();
+      toggleAdminPanel(adminPanel?.classList.contains("hidden"));
+    });
+  }
+
+  if (adminUnlockButton) {
+    bindElementOnce(adminUnlockButton, "AdminUnlockClick", "click", unlockAdminMode);
+  }
+
+  if (adminPasswordInput) {
+    bindElementOnce(adminPasswordInput, "AdminPasswordEnter", "keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        unlockAdminMode();
+      }
+    });
+  }
+
+  if (adminCloseButton) {
+    bindElementOnce(adminCloseButton, "AdminCloseClick", "click", closeAdminPanel);
+  }
+
+  adminLevelButtons.forEach((button) => {
+    bindElementOnce(button, "AdminLevelSelect", "click", () => {
+      state.adminSelectedLevel = Number(button.dataset.adminLevel) || 1;
+      updateAdminUI();
+    });
+  });
+
+  if (adminPlayButton) {
+    bindElementOnce(adminPlayButton, "AdminPlayClick", "click", startAdminLevel);
+  }
+
+  if (adminLockButton) {
+    bindElementOnce(adminLockButton, "AdminLockClick", "click", lockAdminPanel);
+  }
+
   if (signOutButton) {
     bindElementOnce(signOutButton, "SignOutClick", "click", async () => {
       if (!state.user) {
@@ -1555,9 +1714,9 @@ function prettifyVehicleName(vehicleName = state.selectedVehicle) {
     "car-muscle": "Muscle Car",
     "car-electric": "Electric Car",
     "car-truck": "Truck",
-    "jet-silver": "Silver Jet",
-    "jet-gold": "Gold Jet",
-    "jet-stealth": "Stealth Jet",
+    "jet-silver": "Silver Private Plane",
+    "jet-gold": "Gold Private Plane",
+    "jet-stealth": "Black Private Plane",
   };
 
   return names[vehicleName] || "Racing Vehicle";
@@ -1641,54 +1800,56 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   } else if (isJet) {
     ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(0, -174);
-    ctx.bezierCurveTo(18, -162, 22, -122, 20, -76);
-    ctx.lineTo(78, -28);
-    ctx.lineTo(36, -10);
-    ctx.lineTo(22, 18);
-    ctx.lineTo(68, 76);
-    ctx.lineTo(24, 70);
-    ctx.lineTo(16, 128);
-    ctx.lineTo(36, 164);
-    ctx.lineTo(10, 144);
-    ctx.lineTo(0, 182);
-    ctx.lineTo(-10, 144);
-    ctx.lineTo(-36, 164);
-    ctx.lineTo(-16, 128);
-    ctx.lineTo(-24, 70);
-    ctx.lineTo(-68, 76);
-    ctx.lineTo(-22, 18);
-    ctx.lineTo(-36, -10);
-    ctx.lineTo(-78, -28);
-    ctx.lineTo(-20, -76);
+    ctx.moveTo(0, -180);
+    ctx.bezierCurveTo(16, -170, 18, -128, 16, -80);
+    ctx.lineTo(26, -28);
+    ctx.lineTo(88, 6);
+    ctx.lineTo(28, 18);
+    ctx.lineTo(22, 54);
+    ctx.lineTo(50, 84);
+    ctx.lineTo(18, 82);
+    ctx.lineTo(12, 134);
+    ctx.lineTo(30, 170);
+    ctx.lineTo(8, 154);
+    ctx.lineTo(0, 186);
+    ctx.lineTo(-8, 154);
+    ctx.lineTo(-30, 170);
+    ctx.lineTo(-12, 134);
+    ctx.lineTo(-18, 82);
+    ctx.lineTo(-50, 84);
+    ctx.lineTo(-22, 54);
+    ctx.lineTo(-28, 18);
+    ctx.lineTo(-88, 6);
+    ctx.lineTo(-26, -28);
+    ctx.lineTo(-16, -80);
     ctx.closePath();
     ctx.fill();
 
     ctx.fillStyle = "#eff6ff";
     ctx.beginPath();
-    ctx.moveTo(0, -128);
-    ctx.lineTo(14, -86);
-    ctx.lineTo(12, 92);
-    ctx.lineTo(0, 138);
-    ctx.lineTo(-12, 92);
-    ctx.lineTo(-14, -86);
+    ctx.moveTo(0, -136);
+    ctx.lineTo(10, -92);
+    ctx.lineTo(9, 112);
+    ctx.lineTo(0, 150);
+    ctx.lineTo(-9, 112);
+    ctx.lineTo(-10, -92);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "rgba(17, 30, 43, 0.24)";
-    ctx.fillRect(-9, -52, 18, 168);
+    ctx.fillStyle = "rgba(17, 30, 43, 0.22)";
+    ctx.fillRect(-7, -62, 14, 186);
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
     ctx.beginPath();
-    ctx.roundRect(-7, -108, 14, 42, 7);
+    ctx.roundRect(-6, -122, 12, 48, 6);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.26)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
     ctx.beginPath();
-    ctx.moveTo(-58, -18);
-    ctx.lineTo(58, -18);
-    ctx.lineTo(20, 6);
-    ctx.lineTo(-20, 6);
+    ctx.moveTo(-62, 4);
+    ctx.lineTo(62, 4);
+    ctx.lineTo(18, 24);
+    ctx.lineTo(-18, 24);
     ctx.closePath();
     ctx.fill();
   } else {
@@ -2158,6 +2319,8 @@ function applyVehicleSelection(vehicleName) {
   state.selectedVehicle = vehicleName;
   playerCar.classList.remove(...vehicleClasses);
   playerCar.classList.add(vehicleName);
+  playerCar.style.top = "auto";
+  playerCar.style.bottom = "18px";
 
   if (!state.active) {
     state.playerX = middleLaneX();
@@ -2451,21 +2614,21 @@ function showLevelFourSelection() {
     <div class="level-four-panel">
       <p class="countdown-eyebrow">Congratulations</p>
       <h2>Welcome To Level 4</h2>
-      <p>You are heading into the sky and unlocking private jets. Choose your jet to begin the air race.</p>
+      <p>You are heading into the sky and unlocking private planes. Choose your plane to begin the air race.</p>
       <div class="vehicle-group level-four-group">
-        <h3>Private Jets</h3>
+        <h3>Private Planes</h3>
         <div class="vehicle-grid jet-grid">
           <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
             <span class="vehicle-preview jet-preview jet-silver"></span>
-            <span>Silver Jet</span>
+            <span>Silver Private Plane</span>
           </button>
           <button class="vehicle-option jet-select-option" data-jet="jet-gold" type="button">
             <span class="vehicle-preview jet-preview jet-gold"></span>
-            <span>Gold Jet</span>
+            <span>Gold Private Plane</span>
           </button>
           <button class="vehicle-option jet-select-option" data-jet="jet-stealth" type="button">
             <span class="vehicle-preview jet-preview jet-stealth"></span>
-            <span>Stealth Jet</span>
+            <span>Black Private Plane</span>
           </button>
         </div>
       </div>
@@ -2560,6 +2723,94 @@ async function beginLevel(levelNumber) {
   state.active = true;
   state.pendingTransition = false;
   gameLoop();
+}
+
+function adminLevelStartScore(levelNumber) {
+  if (levelNumber === 2) {
+    return 8000;
+  }
+  if (levelNumber === 3) {
+    return levelTwoEndScore;
+  }
+  if (levelNumber === 4) {
+    return levelFourStartScore;
+  }
+  return 0;
+}
+
+async function initializeRun(levelNumber = 1, startScore = 0) {
+  cancelAnimationFrame(state.animationId);
+  syncGameBounds();
+  await primeMobileAudio();
+  state.score = startScore;
+  state.level = 1;
+  state.livesRemaining = 0;
+  state.baseSpeed = levelOneBaseSpeed;
+  state.baseSpeedTarget = levelOneBaseSpeed;
+  state.currentSpeed = levelOneBaseSpeed;
+  state.boostLevel = 0;
+  state.playerX = middleLaneX();
+  state.nextBoosterScore = 1000;
+  state.nextLaserScore = 2000;
+  state.nextFuelScore = 8700;
+  state.nextFuelDrainScore = 9000;
+  state.nextBarricadeScore = 9200;
+  state.levelStartScore = 0;
+  state.levelTwoWarmupStartAt = 0;
+  state.levelTwoWarmupUntil = 0;
+  state.laserActiveUntil = 0;
+  state.invincibleUntil = 0;
+  state.reviveRunning = false;
+  state.fuelPercent = 100;
+  state.pendingTransition = false;
+  state.levelFourSelectionOpen = false;
+  state.enemyRespawns = 0;
+
+  roadLines.forEach((line, index) => {
+    line.style.top = `${20 + index * 160}px`;
+    line.style.left = "50%";
+  });
+
+  resetEnemies();
+  clearBarricades();
+  clearBooster();
+  state.pickupType = "";
+  playerCar.style.left = `${state.playerX}px`;
+  scoreDisplay.textContent = String(startScore);
+  updateLevelDisplay();
+  updateLivesDisplay();
+  updateFuelDisplay();
+  applyLevelTheme();
+  refreshSpeed();
+  updateLaserPointer();
+  message.classList.add("hidden");
+  syncVehiclePreviewVisibility();
+  startButton.textContent = "Restart Game";
+
+  await beginLevel(levelNumber);
+}
+
+async function startAdminLevel() {
+  if (state.active || state.countdownRunning || state.pendingTransition) {
+    return;
+  }
+
+  if (!state.adminUnlocked) {
+    updateAdminStatus("Unlock admin access first.", false);
+    return;
+  }
+
+  startButton.blur();
+  const levelNumber = state.adminSelectedLevel;
+  const startScore = adminLevelStartScore(levelNumber);
+
+  if (levelNumber === 4 && !state.selectedVehicle.startsWith("jet-")) {
+    applyVehicleSelection("jet-silver");
+  }
+
+  toggleAdminPanel(false);
+  updateCloudStatus(`Admin jump ready. Launching Level ${levelNumber}.`, true);
+  await initializeRun(levelNumber, startScore);
 }
 
 function setControlState(controlName, pressed) {
@@ -2900,56 +3151,7 @@ async function startGame() {
     }
     updateGuestAccessUI();
   }
-
-  cancelAnimationFrame(state.animationId);
-  syncGameBounds();
-  await primeMobileAudio();
-  state.score = 0;
-  state.level = 1;
-  state.livesRemaining = 0;
-  state.baseSpeed = levelOneBaseSpeed;
-  state.baseSpeedTarget = levelOneBaseSpeed;
-  state.currentSpeed = levelOneBaseSpeed;
-  state.boostLevel = 0;
-  state.playerX = middleLaneX();
-  state.nextBoosterScore = 1000;
-  state.nextLaserScore = 2000;
-  state.nextFuelScore = 8700;
-  state.nextFuelDrainScore = 9000;
-  state.nextBarricadeScore = 9200;
-  state.levelStartScore = 0;
-  state.levelTwoWarmupStartAt = 0;
-  state.levelTwoWarmupUntil = 0;
-  state.laserActiveUntil = 0;
-  state.invincibleUntil = 0;
-  state.reviveRunning = false;
-  state.fuelPercent = 100;
-  state.pendingTransition = false;
-  state.levelFourSelectionOpen = false;
-  state.enemyRespawns = 0;
-
-  roadLines.forEach((line, index) => {
-    line.style.top = `${20 + index * 160}px`;
-    line.style.left = "50%";
-  });
-
-  resetEnemies();
-  clearBarricades();
-  clearBooster();
-  state.pickupType = "";
-  playerCar.style.left = `${state.playerX}px`;
-  scoreDisplay.textContent = "0";
-  updateLevelDisplay();
-  updateLivesDisplay();
-  updateFuelDisplay();
-  applyLevelTheme();
-  refreshSpeed();
-  updateLaserPointer();
-  message.classList.add("hidden");
-  syncVehiclePreviewVisibility();
-  startButton.textContent = "Restart Game";
-
-  await beginLevel(1);
+  await initializeRun(1, 0);
 }
 
 function endGame(title = "Crash!") {
@@ -2979,6 +3181,7 @@ function endGame(title = "Crash!") {
 }
 
 applyVehicleSelection(state.selectedVehicle);
+state.adminUnlocked = hasAdminAccess();
 syncGameBounds();
 refreshSpeed();
 syncVehiclePreviewVisibility();
@@ -2989,6 +3192,7 @@ updateLivesDisplay();
 updateFuelDisplay();
 applyLevelTheme();
 bindOverlayControls();
+updateAdminUI();
 showAuthGate();
 initializeSupabase();
 
