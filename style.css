@@ -1428,11 +1428,11 @@ body.is-playing .game-area {
   }
 
   .game-area {
-    width: calc(100vw - 20px);
-    max-width: 390px;
-    height: min(64dvh, 540px);
-    border-left-width: 6px;
-    border-right-width: 6px;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-left-width: 0;
+    border-right-width: 0;
   }
 
   body.is-playing .game-area {
@@ -1646,7 +1646,12 @@ body.is-playing .game-area {
   }
 
   .game-area {
-    height: min(67dvh, 560px);
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-radius: 0;
   }
 
   body.is-playing .game-area {
