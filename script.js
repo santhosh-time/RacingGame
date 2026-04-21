@@ -175,6 +175,8 @@ const audioState = {
   waterStarted: false,
   musicTimer: null,
   musicThemeLevel: 0,
+  gameOverMusicTimer: null,
+  gameOverMusicActive: false,
   primeNode: null,
 };
 
@@ -1489,6 +1491,7 @@ function updateProfileInputs() {
 
 function showVehicleSetup() {
   const { racerGate, vehicleSetup, guestRaceReady, authRacerNameInput, startButton, vehicleOptions } = overlayRefs();
+  stopGameOverMusic();
   message.classList.remove("game-over");
   message.classList.remove("choice-mode");
   message.classList.remove("guest-race-mode");
@@ -1521,6 +1524,7 @@ function showVehicleSetup() {
 
 function showAuthGate() {
   const { racerGate, vehicleSetup, guestRaceReady } = overlayRefs();
+  stopGameOverMusic();
   message.classList.remove("game-over");
   message.classList.remove("choice-mode");
   message.classList.remove("guest-race-mode");
@@ -1713,6 +1717,7 @@ function resetSessionForNewGame() {
   state.active = false;
   cancelAnimationFrame(state.animationId);
   stopBackgroundMusic();
+  stopGameOverMusic();
   clearBooster();
   state.score = 0;
   state.level = 1;
@@ -2707,6 +2712,105 @@ function stopBackgroundMusic() {
   audioState.musicThemeLevel = 0;
 }
 
+function playPluckedMusicNote(context, frequency, startTime, duration, volume = 0.32) {
+  if (!context || !audioState.masterGain) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  const lowpass = context.createBiquadFilter();
+
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, frequency * 0.985), startTime + duration);
+
+  lowpass.type = "lowpass";
+  lowpass.frequency.setValueAtTime(Math.max(900, frequency * 4.8), startTime);
+  lowpass.Q.value = 0.3;
+
+  gainNode.gain.setValueAtTime(0.0001, startTime);
+  gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.012);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(lowpass);
+  lowpass.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.03);
+}
+
+function scheduleGameOverMusicBar(startTime) {
+  if (!audioState.context || !state.backgroundSoundEnabled) {
+    return;
+  }
+
+  const beatSeconds = 0.52;
+  const progression = [
+    [57, 61, 64],
+    [54, 57, 61],
+    [52, 56, 59],
+    [50, 54, 57],
+  ];
+  const melody = [76, 73, 71, 69, 71, 73, 76, 78];
+
+  progression.forEach((chord, chordIndex) => {
+    const chordStart = startTime + chordIndex * beatSeconds * 2;
+    chord.forEach((noteNumber, noteIndex) => {
+      playPluckedMusicNote(
+        audioState.context,
+        midiToFrequency(noteNumber + (noteIndex === 0 ? -12 : 0)),
+        chordStart + noteIndex * 0.028,
+        beatSeconds * 1.8,
+        noteIndex === 0 ? 0.34 : 0.28,
+      );
+    });
+  });
+
+  melody.forEach((noteNumber, melodyIndex) => {
+    const noteStart = startTime + melodyIndex * beatSeconds;
+    playPluckedMusicNote(audioState.context, midiToFrequency(noteNumber), noteStart + 0.06, beatSeconds * 0.92, 0.36);
+  });
+}
+
+function stopGameOverMusic() {
+  if (audioState.gameOverMusicTimer) {
+    window.clearInterval(audioState.gameOverMusicTimer);
+    audioState.gameOverMusicTimer = null;
+  }
+  audioState.gameOverMusicActive = false;
+}
+
+async function startGameOverMusic(forceRestart = false) {
+  if (!state.backgroundSoundEnabled) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context) {
+    return;
+  }
+
+  if (!forceRestart && audioState.gameOverMusicTimer && audioState.gameOverMusicActive) {
+    return;
+  }
+
+  stopBackgroundMusic();
+  stopGameOverMusic();
+
+  const barSeconds = 0.52 * 8;
+  const scheduleBar = () => {
+    if (!state.backgroundSoundEnabled) {
+      return;
+    }
+    scheduleGameOverMusicBar(context.currentTime + 0.05);
+  };
+
+  audioState.gameOverMusicActive = true;
+  scheduleBar();
+  audioState.gameOverMusicTimer = window.setInterval(scheduleBar, Math.max(1000, barSeconds * 1000));
+}
+
 function scheduleBackgroundMusic(forceRestart = false) {
   if (!audioState.context || !state.backgroundSoundEnabled) {
     return;
@@ -2717,6 +2821,7 @@ function scheduleBackgroundMusic(forceRestart = false) {
     return;
   }
 
+  stopGameOverMusic();
   stopBackgroundMusic();
 
   const theme = musicTheme(levelNumber);
@@ -2744,22 +2849,23 @@ async function startBackgroundMusic(forceRestart = false) {
     return;
   }
 
+  stopGameOverMusic();
   scheduleBackgroundMusic(forceRestart);
 }
 
 function engineSoundProfile(vehicleName) {
   const profiles = {
-    "bike-street": { wave: "sawtooth", baseFrequency: 126, steerBoost: 12, activeGain: 0.065, speedFactor: 10.5 },
-    "bike-speed": { wave: "sawtooth", baseFrequency: 138, steerBoost: 14, activeGain: 0.072, speedFactor: 11.8 },
-    "bike-dirt": { wave: "square", baseFrequency: 112, steerBoost: 11, activeGain: 0.068, speedFactor: 9.6 },
-    "bike-electric": { wave: "triangle", baseFrequency: 176, steerBoost: 7, activeGain: 0.05, speedFactor: 8.2 },
-    "car-sport": { wave: "sawtooth", baseFrequency: 96, steerBoost: 10, activeGain: 0.062, speedFactor: 9.1 },
-    "car-muscle": { wave: "square", baseFrequency: 78, steerBoost: 8, activeGain: 0.075, speedFactor: 8.3 },
-    "car-electric": { wave: "triangle", baseFrequency: 146, steerBoost: 6, activeGain: 0.046, speedFactor: 7.2 },
-    "car-truck": { wave: "square", baseFrequency: 62, steerBoost: 5, activeGain: 0.082, speedFactor: 6.5 },
-    "jet-silver": { wave: "sawtooth", baseFrequency: 54, steerBoost: 3, activeGain: 0.052, speedFactor: 4.1, lowpass: 520 },
-    "jet-gold": { wave: "square", baseFrequency: 48, steerBoost: 2, activeGain: 0.058, speedFactor: 3.7, lowpass: 420 },
-    "jet-stealth": { wave: "triangle", baseFrequency: 60, steerBoost: 2, activeGain: 0.048, speedFactor: 4.5, lowpass: 680 },
+    "bike-street": { wave: "sawtooth", baseFrequency: 126, steerBoost: 12, activeGain: 0.3, speedFactor: 10.5 },
+    "bike-speed": { wave: "sawtooth", baseFrequency: 138, steerBoost: 14, activeGain: 0.33, speedFactor: 11.8 },
+    "bike-dirt": { wave: "square", baseFrequency: 112, steerBoost: 11, activeGain: 0.31, speedFactor: 9.6 },
+    "bike-electric": { wave: "triangle", baseFrequency: 176, steerBoost: 7, activeGain: 0.26, speedFactor: 8.2 },
+    "car-sport": { wave: "sawtooth", baseFrequency: 96, steerBoost: 10, activeGain: 0.29, speedFactor: 9.1 },
+    "car-muscle": { wave: "square", baseFrequency: 78, steerBoost: 8, activeGain: 0.34, speedFactor: 8.3 },
+    "car-electric": { wave: "triangle", baseFrequency: 146, steerBoost: 6, activeGain: 0.24, speedFactor: 7.2 },
+    "car-truck": { wave: "square", baseFrequency: 62, steerBoost: 5, activeGain: 0.36, speedFactor: 6.5 },
+    "jet-silver": { wave: "sawtooth", baseFrequency: 54, steerBoost: 3, activeGain: 0.28, speedFactor: 4.1, lowpass: 520 },
+    "jet-gold": { wave: "square", baseFrequency: 48, steerBoost: 2, activeGain: 0.3, speedFactor: 3.7, lowpass: 420 },
+    "jet-stealth": { wave: "triangle", baseFrequency: 60, steerBoost: 2, activeGain: 0.27, speedFactor: 4.5, lowpass: 680 },
   };
 
   return profiles[vehicleName] || profiles["car-sport"];
@@ -2922,18 +3028,40 @@ function playBoosterSound() {
     startFrequency: 320,
     endFrequency: 980,
     duration: 0.28,
-    volume: 0.12,
+    volume: 0.48,
   });
+}
+
+function playPickupAddedSound() {
+  playToneSweep({
+    category: "background",
+    type: "triangle",
+    startFrequency: 640,
+    endFrequency: 1280,
+    duration: 0.18,
+    volume: 0.48,
+  });
+
+  window.setTimeout(() => {
+    playToneSweep({
+      category: "background",
+      type: "triangle",
+      startFrequency: 980,
+      endFrequency: 1560,
+      duration: 0.15,
+      volume: 0.4,
+    });
+  }, 80);
 }
 
 function playCrashSound() {
   playToneSweep({
-    category: "vehicle",
+    category: "background",
     type: "sawtooth",
     startFrequency: 210,
     endFrequency: 58,
     duration: 0.45,
-    volume: 0.16,
+    volume: 0.64,
   });
 }
 
@@ -2949,13 +3077,13 @@ function playGameOverSound() {
     window.setTimeout(() => {
       playToneSweep({
         category: "background",
-        type: "triangle",
-        startFrequency: note.start,
-        endFrequency: note.end,
-        duration: 0.22,
-        volume: 0.12,
-      });
-    }, note.delay);
+      type: "triangle",
+      startFrequency: note.start,
+      endFrequency: note.end,
+      duration: 0.22,
+      volume: 0.58,
+    });
+  }, note.delay);
   });
 }
 
@@ -2966,7 +3094,7 @@ function playUiTapSound() {
     startFrequency: 520,
     endFrequency: 660,
     duration: 0.08,
-    volume: 0.24,
+    volume: 0.6,
   });
 }
 
@@ -2984,7 +3112,7 @@ function playCountdownBell(count) {
     startFrequency,
     endFrequency: startFrequency * 1.08,
     duration: 0.16,
-    volume: 0.24,
+    volume: 0.48,
   });
 }
 
@@ -2995,30 +3123,32 @@ function playUiWhooshSound() {
     startFrequency: 260,
     endFrequency: 520,
     duration: 0.16,
-    volume: 0.05,
+    volume: 0.48,
   });
 }
 
 function playLevelUpSound() {
-  playToneSweep({
-    category: "ui",
-    type: "triangle",
-    startFrequency: 420,
-    endFrequency: 940,
-    duration: 0.22,
-    volume: 0.07,
-  });
+  const notes = [
+    { start: 520, end: 620, delay: 0, duration: 0.14, volume: 0.68 },
+    { start: 620, end: 760, delay: 120, duration: 0.14, volume: 0.72 },
+    { start: 760, end: 920, delay: 240, duration: 0.16, volume: 0.76 },
+    { start: 980, end: 1120, delay: 430, duration: 0.18, volume: 0.82 },
+    { start: 1120, end: 1280, delay: 610, duration: 0.16, volume: 0.78 },
+    { start: 1280, end: 1460, delay: 770, duration: 0.18, volume: 0.84 },
+  ];
 
-  window.setTimeout(() => {
-    playToneSweep({
-      category: "ui",
-      type: "triangle",
-      startFrequency: 640,
-      endFrequency: 1180,
-      duration: 0.2,
-      volume: 0.06,
-    });
-  }, 110);
+  notes.forEach((note) => {
+    window.setTimeout(() => {
+      playToneSweep({
+        category: "background",
+        type: "triangle",
+        startFrequency: note.start,
+        endFrequency: note.end,
+        duration: note.duration,
+        volume: note.volume,
+      });
+    }, note.delay);
+  });
 }
 
 function vehicleWidth() {
@@ -3523,6 +3653,7 @@ async function beginLevel(levelNumber) {
   state.active = false;
   state.paused = false;
   cancelAnimationFrame(state.animationId);
+  stopGameOverMusic();
   stopEngineSound();
   stopWaterSound();
   stopBackgroundMusic();
@@ -3539,8 +3670,8 @@ async function beginLevel(levelNumber) {
           ? "Ride the open water. Ships ahead."
           : "Level 5 begins. Keep the water run alive.";
 
-  await showCountdownOverlay(title, subtitle);
   playLevelUpSound();
+  await showCountdownOverlay(title, subtitle);
 
   state.level = levelNumber;
   state.levelStartScore = state.score;
@@ -3966,6 +4097,7 @@ function updateBooster(deltaFrames = 1) {
       increaseFuel(fuelPickupRestore);
       updateCloudStatus(`${state.racerName}, fuel restored by ${fuelPickupRestore}%.`, true);
     }
+    playPickupAddedSound();
     clearBooster();
   }
 }
@@ -4057,8 +4189,10 @@ function endGame(title = "Crash!") {
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
+  stopBackgroundMusic();
   playCrashSound();
   playGameOverSound();
+  startGameOverMusic(true);
   state.restartLevel = state.level;
   state.restartVehicle = state.selectedVehicle;
   maybeUpdateBestScore();
