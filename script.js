@@ -63,16 +63,12 @@ const birdEnemyChoices = [
   "bird-falcon",
   "bird-gull",
 ];
-const roadWidthMeters = 14;
+const visibleRoadLengthMeters = 21.33;
 const targetFramesPerSecond = 60;
 const boosterSpawnTop = -140;
 const boosterCollectionZoneTop = 340;
 const boosterSafetyDistance = 170;
 const boosterWidth = 38;
-const guestRunLimit = 3;
-const guestRunsStorageKey = "viral-racing-guest-runs";
-const guestUnlimitedSessionKey = "viral-racing-guest-unlimited";
-const guestUnlimitedCouponCode = "urinfinity";
 const adminSessionKey = "viral-racing-admin";
 const adminAccessCode = "viraladmin";
 const accessWindowHours = 24;
@@ -155,6 +151,9 @@ const state = {
   restartLevel: 1,
   restartVehicle: "bike-street",
   passwordRecoveryMode: false,
+  authView: "choice",
+  guestReadyVehicle: "",
+  entryReady: false,
 };
 
 const audioState = {
@@ -234,7 +233,7 @@ function updatePlayerInvincibility() {
 }
 
 function getCurrentKmph() {
-  const metersPerPixel = roadWidthMeters / gameBounds.width;
+  const metersPerPixel = visibleRoadLengthMeters / gameBounds.height;
   const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
   return Math.round(metersPerSecond * 3.6);
 }
@@ -243,11 +242,16 @@ function overlayRefs() {
   return {
     racerGate: document.getElementById("racerGate"),
     vehicleSetup: document.getElementById("vehicleSetup"),
+    guestRaceReady: document.getElementById("guestRaceReady"),
+    guestRaceReadyText: document.getElementById("guestRaceReadyText"),
+    authChoicePanel: document.getElementById("authChoicePanel"),
     authForm: document.getElementById("authForm"),
     authEmailInput: document.getElementById("authEmailInput"),
     authPasswordInput: document.getElementById("authPasswordInput"),
     authRacerNameInput: document.getElementById("authRacerNameInput"),
     authStatus: document.getElementById("authStatus"),
+    showSignInButton: document.getElementById("showSignInButton"),
+    backToChoiceButton: document.getElementById("backToChoiceButton"),
     forgotPasswordButton: document.getElementById("forgotPasswordButton"),
     passwordResetPanel: document.getElementById("passwordResetPanel"),
     resetPasswordInput: document.getElementById("resetPasswordInput"),
@@ -285,12 +289,8 @@ function overlayRefs() {
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
-    guestDonationPanel: document.getElementById("guestDonationPanel"),
-    guestDonationAmountInput: document.getElementById("guestDonationAmountInput"),
-    guestDonationButton: document.getElementById("guestDonationButton"),
-    guestUnlockPanel: document.getElementById("guestUnlockPanel"),
-    guestUnlockInput: document.getElementById("guestUnlockInput"),
-    guestUnlockButton: document.getElementById("guestUnlockButton"),
+    guestRaceStartButton: document.getElementById("guestRaceStartButton"),
+    guestRaceBackButton: document.getElementById("guestRaceBackButton"),
     vehicleOptions: Array.from(document.querySelectorAll(".vehicle-option")),
   };
 }
@@ -304,17 +304,40 @@ function triggerWelcomeStart() {
     return;
   }
 
+  state.entryReady = true;
   dismissWelcomeModal();
-  const { authEmailInput, signInButton, guestButton } = overlayRefs();
   window.setTimeout(() => {
-    authEmailInput?.focus();
-    if (!authEmailInput && !state.user) {
-      signInButton?.focus();
-    }
-    if (!state.user && !signInButton) {
-      guestButton?.focus();
-    }
+    showAuthGate();
   }, 120);
+}
+
+function setAuthView(viewName = "choice") {
+  state.authView = viewName;
+  const {
+    racerGate,
+    authChoicePanel,
+    authForm,
+    authEmailInput,
+    showSignInButton,
+    guestButton,
+  } = overlayRefs();
+
+  const showChoice = viewName === "choice";
+  message.classList.toggle("choice-mode", showChoice);
+  racerGate?.classList.toggle("choice-view", showChoice);
+  authChoicePanel?.classList.toggle("hidden", !showChoice);
+  authForm?.classList.toggle("hidden", showChoice);
+
+  window.setTimeout(() => {
+    if (showChoice) {
+      guestButton?.focus();
+    } else {
+      authEmailInput?.focus();
+      if (!authEmailInput) {
+        showSignInButton?.focus();
+      }
+    }
+  }, 40);
 }
 
 function bindElementOnce(element, bindingKey, eventName, handler) {
@@ -346,46 +369,6 @@ function isGuestRacerName(name = state.racerName) {
   return !name || name.trim().toLowerCase() === "guest racer";
 }
 
-function getGuestRunsUsed() {
-  try {
-    return Math.max(0, Number(window.localStorage.getItem(guestRunsStorageKey)) || 0);
-  } catch {
-    return 0;
-  }
-}
-
-function setGuestRunsUsed(count) {
-  try {
-    window.localStorage.setItem(guestRunsStorageKey, String(Math.max(0, count)));
-  } catch {
-    // Ignore storage write failures and keep guest mode usable for the session.
-  }
-}
-
-function getGuestRunsRemaining() {
-  return Math.max(0, guestRunLimit - getGuestRunsUsed());
-}
-
-function hasUnlimitedGuestAccess() {
-  try {
-    return window.sessionStorage.getItem(guestUnlimitedSessionKey) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function setUnlimitedGuestAccess(enabled) {
-  try {
-    if (enabled) {
-      window.sessionStorage.setItem(guestUnlimitedSessionKey, "true");
-    } else {
-      window.sessionStorage.removeItem(guestUnlimitedSessionKey);
-    }
-  } catch {
-    // Ignore session storage failures and keep the default guest rule in place.
-  }
-}
-
 function hasAdminAccess() {
   try {
     return window.sessionStorage.getItem(adminSessionKey) === "true";
@@ -405,19 +388,6 @@ function setAdminAccess(enabled) {
     // Keep local admin testing available only when storage works.
   }
   state.adminUnlocked = enabled;
-}
-
-function isGuestLimitReached() {
-  if (hasUnlimitedGuestAccess()) {
-    return false;
-  }
-  return getGuestRunsRemaining() <= 0;
-}
-
-function consumeGuestRun() {
-  const nextValue = Math.min(guestRunLimit, getGuestRunsUsed() + 1);
-  setGuestRunsUsed(nextValue);
-  return nextValue;
 }
 
 function defaultRacerNameForUser(user = state.user) {
@@ -470,12 +440,12 @@ function hasPasswordRecoveryHash() {
 function setPasswordRecoveryMode(isActive) {
   state.passwordRecoveryMode = isActive;
   const {
+    authChoicePanel,
     authPasswordInput,
     authRacerNameInput,
     signInButton,
     signUpButton,
-    guestButton,
-    guestUnlockPanel,
+    backToChoiceButton,
     forgotPasswordButton,
     passwordResetPanel,
     resetPasswordInput,
@@ -486,12 +456,13 @@ function setPasswordRecoveryMode(isActive) {
   authRacerNameInput?.closest(".field")?.classList.toggle("hidden", isActive);
   signInButton?.classList.toggle("hidden", isActive);
   signUpButton?.classList.toggle("hidden", isActive);
-  guestButton?.classList.toggle("hidden", isActive);
-  guestUnlockPanel?.classList.toggle("hidden", true);
+  backToChoiceButton?.classList.toggle("hidden", isActive);
   forgotPasswordButton?.classList.toggle("hidden", isActive);
   passwordResetPanel?.classList.toggle("hidden", !isActive);
+  authChoicePanel?.classList.toggle("hidden", isActive || state.authView !== "choice");
 
   if (isActive) {
+    state.authView = "signin";
     if (resetPasswordInput) {
       resetPasswordInput.value = "";
     }
@@ -502,54 +473,16 @@ function setPasswordRecoveryMode(isActive) {
 }
 
 function updateGuestAccessUI() {
-  const { guestButton, guestUnlockPanel, guestUnlockInput, authStatus } = overlayRefs();
+  const { guestButton, authStatus } = overlayRefs();
   if (!guestButton) {
     return;
   }
 
-  if (hasUnlimitedGuestAccess()) {
-    guestButton.disabled = false;
-    guestButton.textContent = "Play As Guest (Unlimited)";
-    guestUnlockPanel?.classList.add("hidden");
-    if (guestUnlockInput) {
-      guestUnlockInput.value = "";
-    }
-    if (!state.user && authStatus) {
-      updateAuthStatus("Unlimited guest mode is unlocked for this browser session. Keep racing.", true);
-    }
-    return;
+  guestButton.disabled = false;
+  guestButton.textContent = "Play As Guest";
+  if (!state.user && authStatus && state.authView === "choice") {
+    updateAuthStatus("Choose guest mode for a quick ride, or sign in to save your progress.", true);
   }
-
-  const remaining = getGuestRunsRemaining();
-  guestButton.disabled = remaining <= 0;
-  guestButton.textContent = remaining <= 0
-    ? "Guest Mode Over"
-    : `Play As Guest (${remaining} Left)`;
-  guestUnlockPanel?.classList.toggle("hidden", remaining > 0);
-
-  if (!state.user && remaining <= 0 && authStatus) {
-    updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
-  }
-}
-
-function unlockUnlimitedGuestMode() {
-  const { guestUnlockInput } = overlayRefs();
-  const enteredCode = guestUnlockInput?.value?.trim().toLowerCase() || "";
-
-  if (!enteredCode) {
-    updateAuthStatus("Enter your guest unlock code to continue.", false);
-    return;
-  }
-
-  if (enteredCode !== guestUnlimitedCouponCode) {
-    updateAuthStatus("That guest unlock code did not match. Try again.", false);
-    return;
-  }
-
-  setUnlimitedGuestAccess(true);
-  updateGuestAccessUI();
-  updateCloudStatus("Unlimited guest mode is unlocked for this browser session.", true);
-  updateAuthStatus("Unlimited guest mode is unlocked. You can keep racing until this browser session ends.", true);
 }
 
 function updateFeedbackStatus(messageText, isReady = false) {
@@ -1259,15 +1192,15 @@ async function openDonationCheckout(options = {}) {
 
   const {
     guestDonationAmountInput,
-    guestDonationButton,
     supportDonationAmountInput,
-    supportDonationButton,
     authEmailInput,
     authRacerNameInput,
   } = overlayRefs();
   const isSignedInSupport = Boolean(options.signedIn);
-  const donationAmountInput = isSignedInSupport ? supportDonationAmountInput : guestDonationAmountInput;
-  const donationButton = isSignedInSupport ? supportDonationButton : guestDonationButton;
+  const donationAmountInput = options.amountInputOverride
+    || (isSignedInSupport ? supportDonationAmountInput : guestDonationAmountInput);
+  const donationButton = options.buttonOverride
+    || document.getElementById(isSignedInSupport ? "supportDonationButton" : "guestDonationButton");
   const updateDonationStatus = (messageText, isReady = false) => {
     if (isSignedInSupport) {
       updateCloudStatus(messageText, isReady);
@@ -1487,9 +1420,13 @@ async function submitFeedback() {
 function updateSessionModeText() {
   const { sessionModeText } = overlayRefs();
   if (sessionModeText) {
-    sessionModeText.textContent = state.user
-      ? `${state.racerName} is signed in. Highest score is tracked in The Viral Alien game.`
-      : `${state.racerName} is ready. Highest score is tracked only on this device for now.`;
+    if (state.user) {
+      sessionModeText.textContent = `${state.racerName} is signed in. Highest score is tracked in The Viral Alien game.`;
+      sessionModeText.classList.remove("hidden");
+    } else {
+      sessionModeText.textContent = "";
+      sessionModeText.classList.add("hidden");
+    }
   }
 }
 
@@ -1514,21 +1451,12 @@ function updateVehicleUnlockUI() {
 
 function updateProfileInputs() {
   const {
-    profileNameInput,
-    saveProfileButton,
     signOutButton,
     deleteProfileButton,
   } = overlayRefs();
-  if (profileNameInput) {
-    profileNameInput.value = isGuestRacerName() ? "" : state.racerName;
-    profileNameInput.disabled = !state.user;
-  }
-  if (saveProfileButton) {
-    saveProfileButton.disabled = !state.user;
-  }
   if (signOutButton) {
     signOutButton.disabled = false;
-    signOutButton.textContent = state.user ? "Sign Out" : "Sign In / Change Player";
+    signOutButton.textContent = "Go Back";
   }
   if (deleteProfileButton) {
     deleteProfileButton.disabled = !state.user;
@@ -1536,13 +1464,21 @@ function updateProfileInputs() {
 }
 
 function showVehicleSetup() {
-  const { racerGate, vehicleSetup, authRacerNameInput } = overlayRefs();
+  const { racerGate, vehicleSetup, guestRaceReady, authRacerNameInput, startButton, vehicleOptions } = overlayRefs();
   message.classList.remove("game-over");
+  message.classList.remove("choice-mode");
+  message.classList.remove("guest-race-mode");
   racerGate.classList.add("hidden");
   vehicleSetup.classList.remove("hidden");
+  vehicleSetup.classList.add("selection-mode");
+  guestRaceReady?.classList.add("hidden");
+  message.scrollTop = 0;
   setPasswordRecoveryMode(false);
   if (authRacerNameInput) {
     authRacerNameInput.value = isGuestRacerName() ? "" : state.racerName;
+  }
+  if (startButton) {
+    startButton.classList.add("hidden");
   }
   updateProfileInputs();
   updateSessionModeText();
@@ -1552,28 +1488,53 @@ function showVehicleSetup() {
   updateVehicleUnlockUI();
   toggleFeedbackPanel(false);
   syncGameplayChrome();
+  window.setTimeout(() => {
+    const selectedVehicle = vehicleOptions.find((option) => option.dataset.vehicle === state.selectedVehicle && !option.disabled);
+    selectedVehicle?.focus();
+  }, 40);
 }
 
 function showAuthGate() {
-  const { racerGate, vehicleSetup } = overlayRefs();
+  const { racerGate, vehicleSetup, guestRaceReady } = overlayRefs();
   message.classList.remove("game-over");
+  message.classList.remove("choice-mode");
+  message.classList.remove("guest-race-mode");
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
+  guestRaceReady?.classList.add("hidden");
+  message.scrollTop = 0;
   setPasswordRecoveryMode(state.passwordRecoveryMode);
+  if (!state.passwordRecoveryMode) {
+    setAuthView("choice");
+  }
   updateAccessUI();
   updateGuestAccessUI();
   toggleFeedbackPanel(false);
   syncGameplayChrome();
 }
 
-function startGuestMode(name = "") {
-  if (isGuestLimitReached()) {
-    showAuthGate();
-    updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
-    updateGuestAccessUI();
-    return;
-  }
+function showSignInForm() {
+  showAuthGate();
+  setAuthView("signin");
+  updateAuthStatus("Sign in to save your progress and keep racing with your account.", true);
+}
 
+function showGuestRaceReady() {
+  const { racerGate, vehicleSetup, guestRaceReady, guestRaceReadyText } = overlayRefs();
+  message.classList.remove("game-over");
+  message.classList.remove("choice-mode");
+  message.classList.add("guest-race-mode");
+  racerGate.classList.add("hidden");
+  vehicleSetup.classList.add("hidden");
+  guestRaceReady?.classList.remove("hidden");
+  message.scrollTop = 0;
+  if (guestRaceReadyText) {
+    guestRaceReadyText.textContent = `${state.racerName}, your ${prettifyVehicleName(state.selectedVehicle)} is ready. Tap Start Race when you want to begin.`;
+  }
+  syncGameplayChrome();
+}
+
+function startGuestMode(name = "") {
   state.user = null;
   state.racerName = name && name.trim() ? name.trim() : "Guest Racer";
   state.bestScore = 0;
@@ -1581,17 +1542,14 @@ function startGuestMode(name = "") {
   state.cloudSyncActive = false;
   state.accessActive = true;
   state.accessValidUntil = "";
+  state.guestReadyVehicle = "";
+  startButton.textContent = "Start Game";
   updateBestScoreDisplay();
   updateSessionModeText();
   updateProfileInputs();
   updateAccessUI();
-  if (hasUnlimitedGuestAccess()) {
-    updateCloudStatus("Unlimited guest mode is ready for this browser session.", true);
-    updateAuthStatus("Unlimited guest mode is ready. You can sign in later whenever you want.", true);
-  } else {
-    updateCloudStatus(`Guest mode is ready. ${getGuestRunsRemaining()} guest tries are left on this device.`, true);
-    updateAuthStatus("Guest mode is ready. You can sign in later whenever you want.", true);
-  }
+  updateCloudStatus("Guest mode is ready. Choose a vehicle to start your race.", true);
+  updateAuthStatus("Guest mode is ready. Choose a vehicle and start your race.", true);
   showVehicleSetup();
 }
 
@@ -1611,14 +1569,6 @@ async function handleSessionChange(session) {
   state.user = session?.user || null;
   state.cloudSyncActive = Boolean(state.user);
 
-  if (!state.user) {
-    showGuestProfileEditor();
-    showAuthGate();
-    updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
-    updateGuestAccessUI();
-    return;
-  }
-
   if (state.passwordRecoveryMode) {
     showAuthGate();
     setPasswordRecoveryMode(true);
@@ -1628,8 +1578,24 @@ async function handleSessionChange(session) {
     return;
   }
 
-  updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
+  if (!state.user) {
+    showGuestProfileEditor();
+    updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
+    updateGuestAccessUI();
+    if (!state.entryReady) {
+      return;
+    }
+    showAuthGate();
+    return;
+  }
+
   await loadProfile();
+  updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
+
+  if (!state.entryReady || state.authView === "choice") {
+    return;
+  }
+
   showVehicleSetup();
 }
 
@@ -1775,6 +1741,8 @@ function bindOverlayControls() {
     authEmailInput,
     authPasswordInput,
     authRacerNameInput,
+    showSignInButton,
+    backToChoiceButton,
     forgotPasswordButton,
     resetPasswordButton,
     cancelResetPasswordButton,
@@ -1782,11 +1750,9 @@ function bindOverlayControls() {
     signInButton,
     signUpButton,
     guestButton,
-    guestDonationButton,
+    guestRaceStartButton,
+    guestRaceBackButton,
     supportDonationButton,
-    guestUnlockInput,
-    guestUnlockButton,
-    saveProfileButton,
     signOutButton,
     deleteProfileButton,
     feedbackToggleButton,
@@ -1812,6 +1778,8 @@ function bindOverlayControls() {
       overlayRefs().vehicleOptions.forEach((item) => item.classList.remove("selected"));
       option.classList.add("selected");
       applyVehicleSelection(option.dataset.vehicle);
+      state.guestReadyVehicle = option.dataset.vehicle;
+      showGuestRaceReady();
     });
   });
 
@@ -1839,6 +1807,18 @@ function bindOverlayControls() {
       } catch (error) {
         updateAuthStatus(formatSupabaseError(error, "Could not sign in."), false);
       }
+    });
+  }
+
+  if (showSignInButton) {
+    bindElementOnce(showSignInButton, "ShowSignInClick", "click", showSignInForm);
+  }
+
+  if (backToChoiceButton) {
+    bindElementOnce(backToChoiceButton, "BackToChoiceClick", "click", () => {
+      setPasswordRecoveryMode(false);
+      setAuthView("choice");
+      updateAuthStatus("Choose guest mode for a quick ride, or sign in to save your progress.", true);
     });
   }
 
@@ -1899,33 +1879,20 @@ function bindOverlayControls() {
 
   if (guestButton) {
     bindElementOnce(guestButton, "GuestClick", "click", () => {
-      startGuestMode(authRacerNameInput?.value || "");
+      startGuestMode("Guest Racer");
     });
   }
 
-  if (guestDonationButton) {
-    bindElementOnce(guestDonationButton, "GuestDonateClick", "click", () => openDonationCheckout());
+  if (guestRaceStartButton) {
+    bindElementOnce(guestRaceStartButton, "GuestRaceStartClick", "click", startGame);
+  }
+
+  if (guestRaceBackButton) {
+    bindElementOnce(guestRaceBackButton, "GuestRaceBackClick", "click", showVehicleSetup);
   }
 
   if (supportDonationButton) {
     bindElementOnce(supportDonationButton, "SupportDonateClick", "click", () => openDonationCheckout({ signedIn: true }));
-  }
-
-  if (guestUnlockButton) {
-    bindElementOnce(guestUnlockButton, "GuestUnlockClick", "click", unlockUnlimitedGuestMode);
-  }
-
-  if (guestUnlockInput) {
-    bindElementOnce(guestUnlockInput, "GuestUnlockEnter", "keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        unlockUnlimitedGuestMode();
-      }
-    });
-  }
-
-  if (saveProfileButton) {
-    bindElementOnce(saveProfileButton, "SaveProfileClick", "click", saveProfileName);
   }
 
   if (deleteProfileButton) {
@@ -1989,21 +1956,11 @@ function bindOverlayControls() {
 
   if (signOutButton) {
     bindElementOnce(signOutButton, "SignOutClick", "click", async () => {
-      if (!state.user) {
-        showAuthGate();
-        updateAuthStatus(
-          "Sign in to keep your racer profile and best score updated, or jump in as a guest for local play.",
-          true,
-        );
-        return;
-      }
-
-      if (!supabaseClient) {
-        return;
-      }
-
-      await supabaseClient.auth.signOut();
-      updateAuthStatus("You have signed out. You can sign in again or play as a guest.", true);
+      showAuthGate();
+      updateAuthStatus(
+        "Choose guest mode for a quick ride, or sign in to save your progress.",
+        true,
+      );
     });
   }
 
@@ -3741,26 +3698,7 @@ async function startGame() {
   startButton.blur();
 
   if (!state.user) {
-    if (isGuestLimitReached()) {
-      showAuthGate();
-      updateCloudStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
-      updateAuthStatus("Guest mode is over on this device. Sign in, or enter your unlock code to keep racing.", false);
-      updateGuestAccessUI();
-      return;
-    }
-
-    if (hasUnlimitedGuestAccess()) {
-      updateCloudStatus("Unlimited guest mode is active for this browser session.", true);
-    } else {
-      const usedRuns = consumeGuestRun();
-      const remainingRuns = Math.max(0, guestRunLimit - usedRuns);
-      updateCloudStatus(
-        remainingRuns > 0
-          ? `Guest mode is active. ${remainingRuns} guest tries are left on this device.`
-          : "Guest mode is over on this device after this run. Sign in or unlock unlimited guest mode next time.",
-        remainingRuns > 0,
-      );
-    }
+    updateCloudStatus("Guest mode is active. Enjoy the race.", true);
     updateGuestAccessUI();
   }
 
@@ -3784,15 +3722,26 @@ function endGame(title = "Crash!") {
   maybeUpdateBestScore();
   message.innerHTML = `
     <div class="game-over-panel">
-      <p class="game-over-eyebrow">Race Over</p>
-      <h2>${title}</h2>
+      <h2>Game Over</h2>
+      <p>${title}</p>
       <p>${state.racerName}, your run scored ${state.score}.</p>
       <p>Highest score this session: ${state.bestScore}</p>
       <div class="auth-actions">
         <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
-        <button id="newGameButton" class="auth-button secondary" type="button">New Game</button>
+        <button id="restartRunButton" class="auth-button secondary" type="button">New Game</button>
       </div>
-      <p>Press Restart Game to try again with the same vehicle, or choose New Game to reset best score and select another vehicle.</p>
+      <div class="guest-donation-panel game-over-donation-panel">
+        <p class="guest-donation-title">Support The Game</p>
+        <p class="guest-donation-copy">If you loved the race, you can donate any amount to support The Viral Alien game.</p>
+        <div class="guest-donation-row">
+          <label class="field">
+            <span>Donation Amount (Rs.)</span>
+            <input id="gameOverDonationAmountInput" type="number" min="1" step="1" value="11" placeholder="Enter amount">
+          </label>
+          <button id="gameOverDonationButton" class="auth-button primary" type="button">Donate</button>
+        </div>
+      </div>
+      <p>Start a fresh run and choose your vehicle again whenever you are ready.</p>
     </div>
   `;
   message.classList.add("game-over");
@@ -3800,7 +3749,16 @@ function endGame(title = "Crash!") {
   syncVehiclePreviewVisibility();
   syncGameplayChrome();
   document.getElementById("downloadScoreCardButton").addEventListener("click", saveScoreCard);
-  document.getElementById("newGameButton").addEventListener("click", resetSessionForNewGame);
+  document.getElementById("restartRunButton").addEventListener("click", resetSessionForNewGame);
+  document.getElementById("gameOverDonationButton").addEventListener("click", () => {
+    const donationInput = document.getElementById("gameOverDonationAmountInput");
+    openDonationCheckout({
+      signedIn: Boolean(state.user),
+      amountInputOverride: donationInput,
+      statusTarget: "cloud",
+      buttonOverride: document.getElementById("gameOverDonationButton"),
+    });
+  });
 }
 
 applyVehicleSelection(state.selectedVehicle);

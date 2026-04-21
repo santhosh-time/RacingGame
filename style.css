@@ -49,10 +49,11 @@ body.level-4 {
 }
 
 .app {
-  width: min(94vw, 820px);
+  width: 100vw;
+  min-height: 100dvh;
   display: grid;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 0;
+  padding: 0;
 }
 
 .hud {
@@ -73,22 +74,7 @@ body.level-4 {
 }
 
 body:not(.is-playing) .hud {
-  width: min(94vw, 420px);
-  margin-inline: auto;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-body:not(.is-playing) .stat-card,
-body:not(.is-playing) #fuelCard {
   display: none;
-}
-
-body:not(.is-playing) .hud-actions {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 body.is-playing {
@@ -241,22 +227,20 @@ body:not(.is-playing) .hud-actions .start-button {
 
 .game-shell {
   display: grid;
-  place-items: center;
-  gap: 14px;
-}
-
-body.is-playing .game-shell {
+  place-items: stretch;
   gap: 0;
+  min-height: 100dvh;
 }
 
 .game-area {
   position: relative;
-  width: min(88vw, 420px);
-  height: 640px;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
   overflow: hidden;
-  border-left: 8px solid var(--road-edge);
-  border-right: 8px solid var(--road-edge);
-  border-radius: 16px;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
   background:
     linear-gradient(90deg, #1e1e1e 0 25%, #262626 25% 50%, #2d2d2d 50% 75%, #232323 75% 100%);
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.35);
@@ -415,6 +399,17 @@ body.is-playing .game-area {
 .welcome-start-button {
   justify-self: center;
   min-width: 150px;
+}
+
+.welcome-actions {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.welcome-sound-button {
+  min-width: 132px;
 }
 
 .road-line {
@@ -728,6 +723,14 @@ body.is-playing .game-area {
   overflow-y: auto;
 }
 
+.message.choice-mode {
+  align-content: center;
+}
+
+.message.guest-race-mode {
+  align-content: center;
+}
+
 .message.game-over {
   align-content: stretch;
   justify-items: stretch;
@@ -796,6 +799,42 @@ body.is-playing .game-area {
   display: grid;
   justify-items: center;
   gap: 14px;
+}
+
+#guestRaceReady {
+  min-height: 100%;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+#guestRaceReady .auth-actions {
+  width: min(100%, 420px);
+}
+
+.auth-gate.choice-view {
+  min-height: 100%;
+  align-content: center;
+}
+
+.entry-choice-panel {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.auth-gate:not(.choice-view) .account-secondary-actions,
+.auth-gate:not(.choice-view) .feedback-panel,
+.auth-gate:not(.choice-view) .admin-launch-row,
+.auth-gate:not(.choice-view) .admin-panel {
+  display: none;
+}
+
+.garage-start-row {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  margin-top: 2px;
 }
 
 .game-over-panel {
@@ -1034,10 +1073,35 @@ body.is-playing .game-area {
   width: 100%;
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+}
+
+.vehicle-setup {
+  min-height: 100%;
+  align-content: start;
+}
+
+.vehicle-setup .profile-panel {
+  order: 99;
+  margin-top: auto;
+  justify-items: center;
+}
+
+.vehicle-setup.selection-mode .guest-donation-panel,
+.vehicle-setup.selection-mode .account-secondary-actions,
+.vehicle-setup.selection-mode .feedback-panel,
+.vehicle-setup.selection-mode .admin-launch-row,
+.vehicle-setup.selection-mode .admin-panel,
+.vehicle-setup.selection-mode .garage-start-row {
+  display: none;
+}
+
+.vehicle-setup.selection-mode .vehicle-picker {
+  max-height: none;
+  overflow: visible;
 }
 
 .feedback-panel {
@@ -1084,6 +1148,11 @@ body.is-playing .game-area {
 .guest-donation-row {
   display: grid;
   gap: 10px;
+}
+
+.game-over-donation-panel {
+  width: min(100%, 520px);
+  margin-top: 6px;
 }
 
 .admin-launch-row {
@@ -1432,6 +1501,14 @@ body.is-playing .game-area {
 
   .welcome-start-button {
     min-width: 120px;
+  }
+
+  .welcome-actions {
+    gap: 8px;
+  }
+
+  .welcome-sound-button {
+    min-width: 104px;
   }
 
   .message {

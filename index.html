@@ -41,10 +41,6 @@
         <p class="label">Fuel</p>
         <h1 id="fuelDisplay">100%</h1>
       </div>
-      <div class="hud-actions">
-        <button id="soundButton" class="sound-button" type="button">Sound: On</button>
-        <button id="startButton" class="start-button" type="button">Start Game</button>
-      </div>
     </section>
 
     <section class="game-shell">
@@ -62,18 +58,24 @@
             <p class="welcome-eyebrow">Welcome To</p>
             <h2>The Viral Alien Games</h2>
             <p>Start your ride, choose your racer, and jump into the garage.</p>
-            <button id="welcomeStartButton" class="auth-button primary welcome-start-button" type="button">ENTER</button>
+            <div class="welcome-actions">
+              <button id="welcomeStartButton" class="auth-button primary welcome-start-button" type="button">ENTER</button>
+              <button id="soundButton" class="sound-button welcome-sound-button" type="button">Sound: On</button>
+            </div>
           </div>
         </div>
 
         <div id="message" class="message">
           <div id="racerGate" class="auth-gate">
             <h2>Start Your Garage</h2>
-            <p>Sign in to keep your racer profile and best score updated in The Viral Alien game, or jump in as a guest for local play.</p>
+            <p>Choose how you want to enter The Viral Alien game.</p>
 
-            <form id="authForm" class="sign-in-form">
+            <div id="authChoicePanel" class="entry-choice-panel">
               <button id="guestButton" class="auth-button tertiary" type="button">Play As Guest</button>
-              <p class="guest-or-text">or</p>
+              <button id="showSignInButton" class="auth-button primary" type="button">Sign In</button>
+            </div>
+
+            <form id="authForm" class="sign-in-form hidden">
               <label class="field">
                 <span>Email</span>
                 <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email">
@@ -91,6 +93,7 @@
                 <button id="signUpButton" class="auth-button primary" type="button">Sign Up</button>
               </div>
               <button id="forgotPasswordButton" class="auth-button tertiary" type="button">Forgot Password?</button>
+              <button id="backToChoiceButton" class="auth-button tertiary" type="button">Back</button>
               <div id="passwordResetPanel" class="guest-unlock-panel hidden">
                 <label class="field">
                   <span>New Password</span>
@@ -105,40 +108,76 @@
                   <button id="cancelResetPasswordButton" class="auth-button secondary" type="button">Back</button>
                 </div>
               </div>
-              <div id="guestDonationPanel" class="guest-donation-panel">
-                <p class="guest-donation-title">Support The Game</p>
-                <p class="guest-donation-copy">If you love the game, you can donate and support The Viral Alien game.</p>
-                <div class="guest-donation-row">
-                  <label class="field">
-                    <span>Donation Amount (Rs.)</span>
-                    <input id="guestDonationAmountInput" type="number" min="1" step="1" value="10" placeholder="Enter amount">
-                  </label>
-                  <button id="guestDonationButton" class="auth-button primary" type="button">Donate</button>
+              <p id="authStatus" class="auth-status">Sign in to save your progress and keep racing with your account.</p>
+            </form>
+            <div class="account-secondary-actions">
+              <button id="feedbackToggleButton" class="auth-button tertiary feedback-toggle-button" type="button">Feedback Survey</button>
+            </div>
+            <div id="feedbackPanel" class="feedback-panel hidden">
+              <p class="feedback-intro">Tell us how the ride felt and what would make Viral Racing Game even better.</p>
+              <label class="field">
+                <span>How was your drive?</span>
+                <select id="feedbackRatingInput">
+                  <option value="5">5 - Amazing</option>
+                  <option value="4">4 - Really Good</option>
+                  <option value="3">3 - Solid</option>
+                  <option value="2">2 - Needs Work</option>
+                  <option value="1">1 - Rough Ride</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>What should we improve?</span>
+                <textarea id="feedbackMessageInput" rows="4" maxlength="600" placeholder="Tell us what felt great, what felt off, or what you want to see next."></textarea>
+              </label>
+              <label class="field">
+                <span>Contact email (optional)</span>
+                <input id="feedbackEmailInput" type="email" placeholder="you@example.com" autocomplete="email">
+              </label>
+              <div class="auth-actions compact">
+                <button id="sendFeedbackButton" class="auth-button primary" type="button">Send Feedback</button>
+                <button id="cancelFeedbackButton" class="auth-button secondary" type="button">Close</button>
+              </div>
+              <p id="feedbackStatus" class="auth-status">Your feedback helps us tune the next ride.</p>
+            </div>
+            <div class="admin-launch-row">
+              <button id="adminToggleButton" class="admin-icon-button" type="button" aria-label="Admin access">A</button>
+            </div>
+            <div id="adminPanel" class="admin-panel hidden">
+              <p class="admin-title">Admin Access</p>
+              <div id="adminLoginSection" class="admin-login-section">
+                <label class="field">
+                  <span>Admin Code</span>
+                  <input id="adminPasswordInput" type="password" maxlength="24" placeholder="Enter admin code" autocomplete="off">
+                </label>
+                <div class="auth-actions compact">
+                  <button id="adminUnlockButton" class="auth-button primary" type="button">Unlock Admin</button>
+                  <button id="adminCloseButton" class="auth-button secondary" type="button">Close</button>
                 </div>
               </div>
-              <div id="guestUnlockPanel" class="guest-unlock-panel hidden">
-                <label class="field">
-                  <span>Guest Unlock Code</span>
-                  <input id="guestUnlockInput" type="text" maxlength="24" placeholder="Enter coupon code" autocomplete="off">
-                </label>
-                <button id="guestUnlockButton" class="auth-button primary" type="button">Unlock Guest Mode</button>
+              <div id="adminLevelSection" class="admin-level-section hidden">
+                <p class="admin-intro">Choose the level you want to test directly.</p>
+                <div class="admin-level-grid">
+                  <button class="admin-level-button selected" type="button" data-admin-level="1">Level 1</button>
+                  <button class="admin-level-button" type="button" data-admin-level="2">Level 2</button>
+                  <button class="admin-level-button" type="button" data-admin-level="3">Level 3</button>
+                  <button class="admin-level-button" type="button" data-admin-level="4">Level 4</button>
+                  <button class="admin-level-button" type="button" data-admin-level="5">Level 5</button>
+                </div>
+                <div class="auth-actions compact">
+                  <button id="adminPlayButton" class="auth-button primary" type="button">Play Selected Level</button>
+                  <button id="adminLockButton" class="auth-button secondary" type="button">Lock</button>
+                </div>
               </div>
-              <p id="authStatus" class="auth-status">Sign in to save your progress. Guest mode keeps scores only on this device.</p>
-            </form>
+              <p id="adminStatus" class="auth-status">Admin tools are for testing and level jumps.</p>
+            </div>
           </div>
 
           <div id="vehicleSetup" class="vehicle-setup hidden">
             <h2>Choose Your Vehicle</h2>
             <p id="sessionModeText">Racer ready. Best score is tracked for this session.</p>
-            <p id="cloudStatus" class="cloud-status">Checking your game progress...</p>
             <div class="profile-panel">
-              <label class="field profile-field">
-                <span>Profile Racer Name</span>
-                <input id="profileNameInput" type="text" maxlength="18" placeholder="Guest Racer" autocomplete="nickname">
-              </label>
               <div class="auth-actions compact">
-                <button id="saveProfileButton" class="auth-button primary" type="button">Save Name</button>
-                <button id="signOutButton" class="auth-button secondary" type="button">Sign Out</button>
+                <button id="signOutButton" class="auth-button secondary" type="button">Go Back</button>
               </div>
             </div>
 
@@ -207,76 +246,31 @@
             </div>
 
             <p>Use Left and Right to dodge through traffic and hazards.</p>
+            <div class="garage-start-row">
+              <button id="startButton" class="start-button" type="button">Start Game</button>
+            </div>
             <div id="supportPanel" class="guest-donation-panel">
               <p class="guest-donation-title">Support The Game</p>
               <p class="guest-donation-copy">If you love the game, you can donate and support The Viral Alien game.</p>
               <div class="guest-donation-row">
                 <label class="field">
                   <span>Donation Amount (Rs.)</span>
-                  <input id="supportDonationAmountInput" type="number" min="1" step="1" value="10" placeholder="Enter amount">
+                  <input id="supportDonationAmountInput" type="number" min="1" step="1" value="11" placeholder="Enter amount">
                 </label>
                 <button id="supportDonationButton" class="auth-button primary" type="button">Donate</button>
               </div>
             </div>
             <div class="account-secondary-actions">
-              <button id="feedbackToggleButton" class="auth-button tertiary feedback-toggle-button" type="button">Feedback Survey</button>
               <button id="deleteProfileButton" class="auth-button danger delete-profile-button" type="button">Delete Account</button>
             </div>
-            <div id="feedbackPanel" class="feedback-panel hidden">
-              <p class="feedback-intro">Tell us how the ride felt and what would make Viral Racing Game even better.</p>
-              <label class="field">
-                <span>How was your drive?</span>
-                <select id="feedbackRatingInput">
-                  <option value="5">5 - Amazing</option>
-                  <option value="4">4 - Really Good</option>
-                  <option value="3">3 - Solid</option>
-                  <option value="2">2 - Needs Work</option>
-                  <option value="1">1 - Rough Ride</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>What should we improve?</span>
-                <textarea id="feedbackMessageInput" rows="4" maxlength="600" placeholder="Tell us what felt great, what felt off, or what you want to see next."></textarea>
-              </label>
-              <label class="field">
-                <span>Contact email (optional)</span>
-                <input id="feedbackEmailInput" type="email" placeholder="you@example.com" autocomplete="email">
-              </label>
-              <div class="auth-actions compact">
-                <button id="sendFeedbackButton" class="auth-button primary" type="button">Send Feedback</button>
-                <button id="cancelFeedbackButton" class="auth-button secondary" type="button">Close</button>
-              </div>
-              <p id="feedbackStatus" class="auth-status">Your feedback helps us tune the next ride.</p>
-            </div>
-            <div class="admin-launch-row">
-              <button id="adminToggleButton" class="admin-icon-button" type="button" aria-label="Admin access">A</button>
-            </div>
-            <div id="adminPanel" class="admin-panel hidden">
-              <p class="admin-title">Admin Access</p>
-              <div id="adminLoginSection" class="admin-login-section">
-                <label class="field">
-                  <span>Admin Code</span>
-                  <input id="adminPasswordInput" type="password" maxlength="24" placeholder="Enter admin code" autocomplete="off">
-                </label>
-                <div class="auth-actions compact">
-                  <button id="adminUnlockButton" class="auth-button primary" type="button">Unlock Admin</button>
-                  <button id="adminCloseButton" class="auth-button secondary" type="button">Close</button>
-                </div>
-              </div>
-              <div id="adminLevelSection" class="admin-level-section hidden">
-                <p class="admin-intro">Choose the level you want to test directly.</p>
-                <div class="admin-level-grid">
-                  <button class="admin-level-button selected" data-admin-level="1" type="button">Level 1</button>
-                  <button class="admin-level-button" data-admin-level="2" type="button">Level 2</button>
-                  <button class="admin-level-button" data-admin-level="3" type="button">Level 3</button>
-                  <button class="admin-level-button" data-admin-level="4" type="button">Level 4</button>
-                </div>
-                <div class="auth-actions compact">
-                  <button id="adminPlayButton" class="auth-button primary" type="button">Play Selected Level</button>
-                  <button id="adminLockButton" class="auth-button secondary" type="button">Close</button>
-                </div>
-              </div>
-              <p id="adminStatus" class="auth-status">Admin level jump is for local testing.</p>
+          </div>
+
+          <div id="guestRaceReady" class="vehicle-setup hidden">
+            <h2>Start Race</h2>
+            <p id="guestRaceReadyText">Your guest racer is ready. Start the race when you are set.</p>
+            <div class="auth-actions compact">
+              <button id="guestRaceStartButton" class="auth-button primary" type="button">Start Race</button>
+              <button id="guestRaceBackButton" class="auth-button secondary" type="button">Choose Another Vehicle</button>
             </div>
           </div>
         </div>
