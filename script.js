@@ -9,6 +9,7 @@ const fuelCard = document.getElementById("fuelCard");
 const fuelDisplay = document.getElementById("fuelDisplay");
 const soundButton = document.getElementById("soundButton");
 const startButton = document.getElementById("startButton");
+const pauseButton = document.getElementById("pauseButton");
 const message = document.getElementById("message");
 const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
@@ -141,6 +142,7 @@ const state = {
   countdownRunning: false,
   pendingTransition: false,
   reviveRunning: false,
+  paused: false,
   accessActive: false,
   accessValidUntil: "",
   accessBusy: false,
@@ -1718,10 +1720,13 @@ function resetSessionForNewGame() {
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.reviveRunning = false;
+  state.paused = false;
   state.fuelPercent = 100;
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
   state.lastFrameTime = 0;
+  state.keys.ArrowLeft = false;
+  state.keys.ArrowRight = false;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
   updateBestScoreDisplay();
@@ -1738,6 +1743,7 @@ function resetSessionForNewGame() {
     line.style.left = "50%";
   });
   message.innerHTML = initialMessageMarkup;
+  message.classList.remove("paused-mode");
   message.classList.remove("game-over");
   bindOverlayControls();
   showVehicleSetup();
@@ -2887,6 +2893,7 @@ function syncVehiclePreviewVisibility() {
 function syncGameplayChrome() {
   const inRaceMode = Boolean(
     state.active ||
+    state.paused ||
     state.pendingTransition ||
     state.countdownRunning ||
     state.reviveRunning
@@ -3209,6 +3216,7 @@ function showLevelFourSelection() {
 async function beginLevel(levelNumber) {
   state.pendingTransition = true;
   state.active = false;
+  state.paused = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
@@ -3336,6 +3344,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.reviveRunning = false;
+  state.paused = false;
   state.fuelPercent = 100;
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
@@ -3435,6 +3444,7 @@ async function handleVehicleCrash() {
     state.livesRemaining -= 1;
     state.reviveRunning = true;
     state.active = false;
+    state.paused = false;
     state.pendingTransition = true;
     syncGameplayChrome();
     cancelAnimationFrame(state.animationId);
@@ -3651,7 +3661,7 @@ function updateBooster(deltaFrames = 1) {
 }
 
 async function gameLoop(frameTime = performance.now()) {
-  if (!state.active) {
+  if (!state.active || state.paused) {
     return;
   }
   const deltaFrames = getDeltaFrames(frameTime);
@@ -3711,7 +3721,7 @@ async function gameLoop(frameTime = performance.now()) {
 }
 
 async function startGame() {
-  if (state.active || state.countdownRunning || state.pendingTransition) {
+  if (state.active || state.paused || state.countdownRunning || state.pendingTransition) {
     return;
   }
 
@@ -3733,6 +3743,7 @@ async function startGame() {
 
 function endGame(title = "Crash!") {
   state.active = false;
+  state.paused = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
@@ -3779,6 +3790,69 @@ function endGame(title = "Crash!") {
       buttonOverride: document.getElementById("gameOverDonationButton"),
     });
   });
+}
+
+async function resumeGame() {
+  if (!state.paused || state.countdownRunning || state.pendingTransition || state.reviveRunning) {
+    return;
+  }
+
+  message.classList.add("hidden");
+  message.classList.remove("paused-mode");
+  syncVehiclePreviewVisibility();
+  state.paused = false;
+  state.lastFrameTime = performance.now();
+  await primeMobileAudio();
+  if (state.soundEnabled) {
+    await startEngineSound();
+    if (state.level >= 4) {
+      await startWaterSound();
+    }
+    updateEngineSound();
+    updateWaterSound();
+  }
+  state.active = true;
+  syncGameplayChrome();
+  gameLoop(state.lastFrameTime);
+}
+
+function pauseGame() {
+  if (!state.active || state.paused || state.countdownRunning || state.pendingTransition || state.reviveRunning) {
+    return;
+  }
+
+  state.active = false;
+  state.paused = true;
+  state.keys.ArrowLeft = false;
+  state.keys.ArrowRight = false;
+  cancelAnimationFrame(state.animationId);
+  stopEngineSound();
+  stopWaterSound();
+  message.classList.remove("choice-mode", "guest-race-mode", "game-over");
+  message.classList.add("paused-mode");
+  message.innerHTML = `
+    <div class="pause-panel">
+      <p class="countdown-eyebrow">Race Paused</p>
+      <h2>Paused</h2>
+      <p>${state.racerName}, your ${vehicleLabel(state.selectedVehicle)} is holding position.</p>
+      <div class="auth-actions compact">
+        <button id="resumeRaceButton" class="auth-button primary" type="button">Continue Race</button>
+      </div>
+    </div>
+  `;
+  message.classList.remove("hidden");
+  syncVehiclePreviewVisibility();
+  syncGameplayChrome();
+  document.getElementById("resumeRaceButton")?.addEventListener("click", resumeGame, { once: true });
+}
+
+function togglePauseGame() {
+  if (state.paused) {
+    resumeGame();
+    return;
+  }
+
+  pauseGame();
 }
 
 applyVehicleSelection(state.selectedVehicle);
@@ -3842,7 +3916,17 @@ soundButton.addEventListener("click", async () => {
   }
 });
 
+pauseButton?.addEventListener("click", () => {
+  togglePauseGame();
+});
+
 window.addEventListener("keydown", (event) => {
+  if (event.code === "Space" && (state.active || state.paused) && !state.countdownRunning && !state.pendingTransition && !state.reviveRunning) {
+    event.preventDefault();
+    togglePauseGame();
+    return;
+  }
+
   if (event.key in state.keys) {
     setControlState(event.key, true);
     event.preventDefault();

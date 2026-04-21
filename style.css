@@ -732,6 +732,10 @@ body.is-playing .game-area {
   align-content: center;
 }
 
+.message.paused-mode {
+  align-content: center;
+}
+
 .message.game-over {
   align-content: stretch;
   justify-items: stretch;
@@ -865,6 +869,24 @@ body.is-playing .game-area {
 
 .game-over-panel p {
   max-width: 36ch;
+}
+
+.pause-panel {
+  min-height: 100%;
+  width: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+
+.pause-panel h2 {
+  font-size: 2.8rem;
+}
+
+.pause-panel p {
+  max-width: 34ch;
 }
 
 .game-over-eyebrow {
@@ -1326,7 +1348,7 @@ body.is-playing .game-area {
 .touch-controls {
   width: min(88vw, 420px);
   display: none;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1353,6 +1375,12 @@ body.is-playing .game-area {
 
 .boost-button {
   color: #ffe08a;
+}
+
+.pause-touch-button {
+  color: #17212b;
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.95), rgba(255, 183, 3, 0.9));
+  border-color: rgba(255, 209, 102, 0.42);
 }
 
 @media (max-width: 480px) {

@@ -10,11 +10,13 @@
     </linearGradient>
   </defs>
   <rect width="120" height="240" fill="none"/>
-  <path d="M30 52 L90 52 L104 126 Q102 182 60 216 Q18 182 16 126 Z" fill="url(#hull)" stroke="#163451" stroke-width="5"/>
-  <rect x="38" y="68" width="44" height="38" rx="12" fill="url(#deck)" stroke="#8cb3d5" stroke-width="3"/>
-  <rect x="46" y="112" width="28" height="32" rx="8" fill="#f5fbff" stroke="#8cb3d5" stroke-width="3"/>
-  <rect x="54" y="24" width="12" height="36" rx="6" fill="#21425f"/>
-  <path d="M60 18 L78 50 L42 50 Z" fill="#ff6b6b"/>
-  <path d="M33 171 Q60 193 87 171" fill="none" stroke="#f8fbff" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="60" cy="198" r="7" fill="#ffcd57"/>
+  <g transform="rotate(180 60 120)">
+    <path d="M30 52 L90 52 L104 126 Q102 182 60 216 Q18 182 16 126 Z" fill="url(#hull)" stroke="#163451" stroke-width="5"/>
+    <rect x="38" y="68" width="44" height="38" rx="12" fill="url(#deck)" stroke="#8cb3d5" stroke-width="3"/>
+    <rect x="46" y="112" width="28" height="32" rx="8" fill="#f5fbff" stroke="#8cb3d5" stroke-width="3"/>
+    <rect x="54" y="24" width="12" height="36" rx="6" fill="#21425f"/>
+    <path d="M60 18 L78 50 L42 50 Z" fill="#ff6b6b"/>
+    <path d="M33 171 Q60 193 87 171" fill="none" stroke="#f8fbff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="60" cy="198" r="7" fill="#ffcd57"/>
+  </g>
 </svg>
