@@ -2577,8 +2577,8 @@ function musicTheme(levelNumber = currentMusicLevel()) {
     1: {
       tempo: 88,
       wave: "triangle",
-      volume: 0.052,
-      harmonyVolume: 0.032,
+      volume: 0.48,
+      harmonyVolume: 0.3,
       melodyStep: 0.5,
       chordDuration: 1.7,
       chords: [
@@ -2592,8 +2592,8 @@ function musicTheme(levelNumber = currentMusicLevel()) {
     2: {
       tempo: 94,
       wave: "sine",
-      volume: 0.055,
-      harmonyVolume: 0.034,
+      volume: 0.5,
+      harmonyVolume: 0.312,
       melodyStep: 0.5,
       chordDuration: 1.5,
       chords: [
@@ -2607,8 +2607,8 @@ function musicTheme(levelNumber = currentMusicLevel()) {
     3: {
       tempo: 102,
       wave: "triangle",
-      volume: 0.056,
-      harmonyVolume: 0.034,
+      volume: 0.512,
+      harmonyVolume: 0.32,
       melodyStep: 0.5,
       chordDuration: 1.45,
       chords: [
@@ -2622,8 +2622,8 @@ function musicTheme(levelNumber = currentMusicLevel()) {
     4: {
       tempo: 86,
       wave: "sine",
-      volume: 0.053,
-      harmonyVolume: 0.032,
+      volume: 0.488,
+      harmonyVolume: 0.304,
       melodyStep: 0.5,
       chordDuration: 1.85,
       chords: [
@@ -2637,8 +2637,8 @@ function musicTheme(levelNumber = currentMusicLevel()) {
     5: {
       tempo: 96,
       wave: "triangle",
-      volume: 0.055,
-      harmonyVolume: 0.034,
+      volume: 0.5,
+      harmonyVolume: 0.312,
       melodyStep: 0.5,
       chordDuration: 1.6,
       chords: [
@@ -2875,7 +2875,7 @@ function updateWaterSound() {
   }
 
   const now = audioState.context.currentTime;
-  const targetGain = state.active && state.level >= 4 ? 0.074 : 0.0001;
+  const targetGain = state.active && state.level >= 4 ? 0.56 : 0.0001;
   const targetFrequency = 340 + state.currentSpeed * 18;
 
   audioState.waterFilter.frequency.cancelScheduledValues(now);
