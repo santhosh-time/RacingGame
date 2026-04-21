@@ -72,6 +72,82 @@ body.level-4 {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
+body:not(.is-playing) .hud {
+  width: min(94vw, 420px);
+  margin-inline: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body:not(.is-playing) .stat-card,
+body:not(.is-playing) #fuelCard {
+  display: none;
+}
+
+body:not(.is-playing) .hud-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body.is-playing {
+  place-items: stretch;
+}
+
+body.is-playing .app {
+  width: 100vw;
+  min-height: 100dvh;
+  gap: 0;
+  padding: 0;
+}
+
+body.is-playing .hud {
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  gap: 4px 6px;
+  border-radius: 0 0 16px 16px;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: rgba(9, 17, 28, 0.9);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+body.is-playing .hud:has(#fuelCard:not(.hidden)) {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+body.is-playing .hud-actions,
+body.is-playing #soundButton,
+body.is-playing #startButton {
+  display: none;
+}
+
+body.is-playing .stat-card,
+body.is-playing .compact-stat {
+  min-height: 42px;
+  padding: 2px 0;
+}
+
+body.is-playing .stat-card h1,
+body.is-playing #score,
+body.is-playing #bestScore {
+  font-size: 0.98rem;
+}
+
+body.is-playing #speedDisplay,
+body.is-playing #fuelDisplay,
+body.is-playing #levelDisplay,
+body.is-playing #livesDisplay {
+  font-size: 0.86rem;
+}
+
+body.is-playing .label {
+  font-size: 0.54rem;
+}
+
 .stat-card {
   min-width: 0;
   display: grid;
@@ -158,6 +234,10 @@ body.level-4 {
   gap: 14px;
 }
 
+body.is-playing .game-shell {
+  gap: 0;
+}
+
 .game-area {
   position: relative;
   width: min(88vw, 420px);
@@ -169,6 +249,15 @@ body.level-4 {
   background:
     linear-gradient(90deg, #1e1e1e 0 25%, #262626 25% 50%, #2d2d2d 50% 75%, #232323 75% 100%);
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.35);
+}
+
+body.is-playing .game-area {
+  width: 100vw;
+  max-width: none;
+  height: calc(100dvh - 58px);
+  border-left-width: 0;
+  border-right-width: 0;
+  border-radius: 0;
 }
 
 .game-area.level-2 {
@@ -1149,7 +1238,7 @@ body.level-4 {
 
 .touch-controls {
   width: min(88vw, 420px);
-  display: grid;
+  display: none;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
@@ -1187,18 +1276,22 @@ body.level-4 {
   .app {
     width: 100vw;
     min-height: 100dvh;
-    gap: 10px;
-    padding: 8px 0 10px;
+    gap: 8px;
+    padding: 6px 0 8px;
   }
 
   .hud {
     gap: 8px;
-    padding: 6px 8px;
+    padding: 5px 8px;
     margin: 0 10px;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-auto-rows: minmax(54px, auto);
     align-items: stretch;
+  }
+
+  body:not(.is-playing) .hud {
+    width: calc(100vw - 20px);
   }
 
   .stat-card,
@@ -1259,18 +1352,36 @@ body.level-4 {
     border-right-width: 6px;
   }
 
+  body.is-playing .game-area {
+    width: 100vw;
+    height: calc(100dvh - 50px - 82px);
+    max-width: none;
+    border-left-width: 0;
+    border-right-width: 0;
+  }
+
   .touch-controls {
     width: calc(100vw - 20px);
     max-width: 390px;
     gap: 8px;
-    position: sticky;
-    bottom: 8px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 4;
   }
 
+  body.is-playing .touch-controls {
+    display: grid;
+    width: 100vw;
+    max-width: none;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(7, 16, 28, 0), rgba(7, 16, 28, 0.72));
+  }
+
   .vehicle-picker {
-    gap: 16px;
-    max-height: 250px;
+    gap: 12px;
+    max-height: 220px;
   }
 
   .vehicle-grid {
@@ -1279,6 +1390,103 @@ body.level-4 {
 
   .auth-actions {
     grid-template-columns: 1fr;
+  }
+
+  .welcome-modal {
+    padding: 14px;
+  }
+
+  .welcome-card {
+    width: min(100%, 280px);
+    gap: 10px;
+    padding: 18px 16px;
+  }
+
+  .welcome-card h2 {
+    font-size: 1.45rem;
+  }
+
+  .welcome-card p {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .welcome-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+  }
+
+  .welcome-start-button {
+    min-width: 120px;
+  }
+
+  .message {
+    gap: 8px;
+    padding: 16px 14px 14px;
+  }
+
+  .message h2 {
+    font-size: 1.45rem;
+  }
+
+  .message p {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .auth-gate,
+  .vehicle-setup {
+    gap: 10px;
+  }
+
+  .auth-button {
+    min-height: 40px;
+    font-size: 0.86rem;
+    border-radius: 14px;
+  }
+
+  .field {
+    gap: 4px;
+  }
+
+  .field span {
+    font-size: 0.76rem;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    font-size: 0.86rem;
+  }
+
+  .field input {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .field select,
+  .field textarea {
+    padding: 10px 12px;
+  }
+
+  .auth-status,
+  .cloud-status,
+  .access-status,
+  .guest-donation-copy,
+  .session-mode,
+  .support-copy {
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+
+  .cloud-status,
+  .access-status {
+    padding: 8px 10px;
+  }
+
+  .guest-or-text {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
   }
 
   .touch-button {
@@ -1346,5 +1554,36 @@ body.level-4 {
 
   .game-area {
     height: min(67dvh, 560px);
+  }
+
+  body.is-playing .game-area {
+    width: 100vw;
+    max-width: none;
+    height: calc(100dvh - 56px - 88px);
+    border-left-width: 0;
+    border-right-width: 0;
+    border-radius: 0;
+  }
+
+  body.is-playing .touch-controls {
+    display: grid;
+    width: 100vw;
+    max-width: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(7, 16, 28, 0), rgba(7, 16, 28, 0.72));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.is-playing .touch-controls {
+    display: none;
+  }
+
+  body.is-playing .game-area {
+    height: calc(100dvh - 58px);
   }
 }

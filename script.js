@@ -1551,6 +1551,7 @@ function showVehicleSetup() {
   updateGuestAccessUI();
   updateVehicleUnlockUI();
   toggleFeedbackPanel(false);
+  syncGameplayChrome();
 }
 
 function showAuthGate() {
@@ -1562,6 +1563,7 @@ function showAuthGate() {
   updateAccessUI();
   updateGuestAccessUI();
   toggleFeedbackPanel(false);
+  syncGameplayChrome();
 }
 
 function startGuestMode(name = "") {
@@ -1763,6 +1765,7 @@ function resetSessionForNewGame() {
   updateAuthStatus(`Choose a vehicle for ${state.racerName}. Best score has been reset.`, true);
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
+  syncGameplayChrome();
   startButton.textContent = "Start Game";
 }
 
@@ -2908,6 +2911,20 @@ function syncVehiclePreviewVisibility() {
   playerCar.classList.toggle("hidden-preview", !message.classList.contains("hidden"));
 }
 
+function syncGameplayChrome() {
+  const inRaceMode = Boolean(
+    state.active ||
+    state.pendingTransition ||
+    state.countdownRunning ||
+    state.reviveRunning
+  );
+  document.body.classList.toggle("is-playing", inRaceMode);
+  window.requestAnimationFrame(() => {
+    syncGameBounds();
+    updatePlayerVerticalPosition();
+  });
+}
+
 function createEnemy(y, left) {
   const enemyVehicle = pickEnemyVehicle();
   const width = enemyVehicleWidth(enemyVehicle);
@@ -3155,6 +3172,7 @@ function handleFuelDrain() {
 
 async function showCountdownOverlay(title, subtitle = "") {
   state.countdownRunning = true;
+  syncGameplayChrome();
   const countdownValues = [3, 2, 1];
   for (const count of countdownValues) {
     message.innerHTML = `
@@ -3172,6 +3190,7 @@ async function showCountdownOverlay(title, subtitle = "") {
   message.classList.add("hidden");
   syncVehiclePreviewVisibility();
   state.countdownRunning = false;
+  syncGameplayChrome();
 }
 
 function showLevelFourSelection() {
@@ -3220,6 +3239,7 @@ async function beginLevel(levelNumber) {
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
+  syncGameplayChrome();
 
   const title = levelNumber === 1 ? "Level 1 Starts" : `Entering Level ${levelNumber}`;
   const subtitle = levelNumber === 1
@@ -3299,6 +3319,7 @@ async function beginLevel(levelNumber) {
   updateWaterSound();
   state.active = true;
   state.pendingTransition = false;
+  syncGameplayChrome();
   gameLoop();
 }
 
@@ -3367,6 +3388,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   updateLaserPointer();
   message.classList.add("hidden");
   syncVehiclePreviewVisibility();
+  syncGameplayChrome();
   startButton.textContent = "Restart Game";
 
   await beginLevel(levelNumber);
@@ -3439,6 +3461,7 @@ async function handleVehicleCrash() {
     state.reviveRunning = true;
     state.active = false;
     state.pendingTransition = true;
+    syncGameplayChrome();
     cancelAnimationFrame(state.animationId);
     stopEngineSound();
     state.playerX = middleLaneX();
@@ -3481,6 +3504,7 @@ async function handleVehicleCrash() {
     state.active = true;
     state.pendingTransition = false;
     state.reviveRunning = false;
+    syncGameplayChrome();
     gameLoop();
     return;
   }
@@ -3774,6 +3798,7 @@ function endGame(title = "Crash!") {
   message.classList.add("game-over");
   message.classList.remove("hidden");
   syncVehiclePreviewVisibility();
+  syncGameplayChrome();
   document.getElementById("downloadScoreCardButton").addEventListener("click", saveScoreCard);
   document.getElementById("newGameButton").addEventListener("click", resetSessionForNewGame);
 }
@@ -3792,6 +3817,7 @@ applyLevelTheme();
 bindOverlayControls();
 updateAdminUI();
 showAuthGate();
+syncGameplayChrome();
 initializeSupabase();
 
 startButton.addEventListener("click", startGame);
