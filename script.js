@@ -17,6 +17,7 @@ const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-contr
 const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
 const initialMessageMarkup = message.innerHTML;
+const initialPageUrl = window.location.href;
 const supabaseProjectUrl = "https://tvmvkjoubttuqnlkdciv.supabase.co";
 const supabasePublishableKey = "sb_publishable__allj6AeZXUn1xrfDU317A_f5B01zau";
 const supabaseClient = window.supabase?.createClient
@@ -154,6 +155,7 @@ const state = {
   adminSelectedLevel: 1,
   restartLevel: 1,
   restartVehicle: "bike-street",
+  passwordRecoveryMode: false,
 };
 
 const audioState = {
@@ -247,6 +249,12 @@ function overlayRefs() {
     authPasswordInput: document.getElementById("authPasswordInput"),
     authRacerNameInput: document.getElementById("authRacerNameInput"),
     authStatus: document.getElementById("authStatus"),
+    forgotPasswordButton: document.getElementById("forgotPasswordButton"),
+    passwordResetPanel: document.getElementById("passwordResetPanel"),
+    resetPasswordInput: document.getElementById("resetPasswordInput"),
+    resetPasswordConfirmInput: document.getElementById("resetPasswordConfirmInput"),
+    resetPasswordButton: document.getElementById("resetPasswordButton"),
+    cancelResetPasswordButton: document.getElementById("cancelResetPasswordButton"),
     sessionModeText: document.getElementById("sessionModeText"),
     cloudStatus: document.getElementById("cloudStatus"),
     accessPanel: document.getElementById("accessPanel"),
@@ -433,6 +441,63 @@ function updateAuthStatus(messageText, isReady = false) {
 
   authStatus.textContent = messageText;
   authStatus.classList.toggle("is-connected", isReady);
+}
+
+function getAuthRedirectUrl() {
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    return `${window.location.origin}${window.location.pathname}`;
+  }
+
+  return "https://santhosh-time.github.io/RacingGame/";
+}
+
+function hasPasswordRecoveryHash() {
+  const rawHash = initialPageUrl.includes("#") ? initialPageUrl.slice(initialPageUrl.indexOf("#")) : "";
+  const rawSearchStart = initialPageUrl.indexOf("?");
+  const rawSearchEnd = initialPageUrl.includes("#") ? initialPageUrl.indexOf("#") : initialPageUrl.length;
+  const rawSearch = rawSearchStart >= 0 ? initialPageUrl.slice(rawSearchStart, rawSearchEnd) : "";
+  const hash = rawHash || window.location.hash || "";
+  const search = rawSearch || window.location.search || "";
+
+  if (hash.includes("type=recovery") || search.includes("type=recovery")) {
+    return true;
+  }
+
+  return hash.includes("access_token=") && hash.includes("refresh_token=");
+}
+
+function setPasswordRecoveryMode(isActive) {
+  state.passwordRecoveryMode = isActive;
+  const {
+    authPasswordInput,
+    authRacerNameInput,
+    signInButton,
+    signUpButton,
+    guestButton,
+    guestUnlockPanel,
+    forgotPasswordButton,
+    passwordResetPanel,
+    resetPasswordInput,
+    resetPasswordConfirmInput,
+  } = overlayRefs();
+
+  authPasswordInput?.closest(".field")?.classList.toggle("hidden", isActive);
+  authRacerNameInput?.closest(".field")?.classList.toggle("hidden", isActive);
+  signInButton?.classList.toggle("hidden", isActive);
+  signUpButton?.classList.toggle("hidden", isActive);
+  guestButton?.classList.toggle("hidden", isActive);
+  guestUnlockPanel?.classList.toggle("hidden", true);
+  forgotPasswordButton?.classList.toggle("hidden", isActive);
+  passwordResetPanel?.classList.toggle("hidden", !isActive);
+
+  if (isActive) {
+    if (resetPasswordInput) {
+      resetPasswordInput.value = "";
+    }
+    if (resetPasswordConfirmInput) {
+      resetPasswordConfirmInput.value = "";
+    }
+  }
 }
 
 function updateGuestAccessUI() {
@@ -792,6 +857,7 @@ async function initializeSupabase() {
     return;
   }
 
+  state.passwordRecoveryMode = hasPasswordRecoveryHash();
   updateCloudStatus("Cloud save is ready whenever you want to sign in.", true);
 
   try {
@@ -804,11 +870,33 @@ async function initializeSupabase() {
     state.supabaseReady = true;
     updateCloudStatus("Your cloud garage is ready.", true);
 
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        state.user = session?.user || null;
+        state.cloudSyncActive = Boolean(state.user);
+        showAuthGate();
+        setPasswordRecoveryMode(true);
+        updateAuthStatus("Set your new password below to get back into your garage.", false);
+        const { resetPasswordInput } = overlayRefs();
+        window.setTimeout(() => resetPasswordInput?.focus(), 120);
+        return;
+      }
+
       handleSessionChange(session);
     });
 
-    if (data?.session) {
+    if (data?.session && state.passwordRecoveryMode) {
+      state.user = data.session.user || null;
+      state.cloudSyncActive = Boolean(state.user);
+      showAuthGate();
+      setPasswordRecoveryMode(true);
+      updateAuthStatus("Set your new password below to get back into your garage.", false);
+      const { resetPasswordInput } = overlayRefs();
+      window.setTimeout(() => resetPasswordInput?.focus(), 120);
+      if (window.history?.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+    } else if (data?.session) {
       await handleSessionChange(data.session);
     } else {
       state.user = null;
@@ -1323,6 +1411,7 @@ function showVehicleSetup() {
   message.classList.remove("game-over");
   racerGate.classList.add("hidden");
   vehicleSetup.classList.remove("hidden");
+  setPasswordRecoveryMode(false);
   if (authRacerNameInput) {
     authRacerNameInput.value = isGuestRacerName() ? "" : state.racerName;
   }
@@ -1340,6 +1429,7 @@ function showAuthGate() {
   message.classList.remove("game-over");
   racerGate.classList.remove("hidden");
   vehicleSetup.classList.add("hidden");
+  setPasswordRecoveryMode(state.passwordRecoveryMode);
   updateAccessUI();
   updateGuestAccessUI();
   toggleFeedbackPanel(false);
@@ -1398,10 +1488,101 @@ async function handleSessionChange(session) {
     return;
   }
 
+  if (state.passwordRecoveryMode) {
+    showAuthGate();
+    setPasswordRecoveryMode(true);
+    updateAuthStatus("Enter your new password below, then sign in again with it.", false);
+    const { resetPasswordInput } = overlayRefs();
+    window.setTimeout(() => resetPasswordInput?.focus(), 120);
+    return;
+  }
+
   updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
   await loadProfile();
   await loadAccessPass();
   showVehicleSetup();
+}
+
+async function sendPasswordReset() {
+  if (!supabaseClient) {
+    updateAuthStatus("Password reset is not ready yet. Reload the game and try again.", false);
+    return;
+  }
+
+  const { authEmailInput } = overlayRefs();
+  const email = authEmailInput?.value?.trim();
+
+  if (!email) {
+    updateAuthStatus("Enter your email first so we know where to send the reset link.", false);
+    return;
+  }
+
+  updateAuthStatus("Sending your password reset link...", false);
+
+  try {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirectUrl(),
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    updateAuthStatus("Check your email and open the reset link to choose a new password.", true);
+  } catch (error) {
+    updateAuthStatus(formatSupabaseError(error, "We could not send your password reset link."), false);
+  }
+}
+
+async function completePasswordReset() {
+  if (!supabaseClient) {
+    updateAuthStatus("Password reset is not ready yet. Reload the game and try again.", false);
+    return;
+  }
+
+  const {
+    resetPasswordInput,
+    resetPasswordConfirmInput,
+    authEmailInput,
+  } = overlayRefs();
+  const password = resetPasswordInput?.value || "";
+  const confirmPassword = resetPasswordConfirmInput?.value || "";
+  const recoveryEmail = state.user?.email || authEmailInput?.value?.trim() || "";
+
+  if (!password || !confirmPassword) {
+    updateAuthStatus("Enter your new password in both fields to finish the reset.", false);
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    updateAuthStatus("Those passwords do not match yet. Please try again.", false);
+    return;
+  }
+
+  updateAuthStatus("Saving your new password...", false);
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({
+      password,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (authEmailInput && recoveryEmail) {
+      authEmailInput.value = recoveryEmail;
+    }
+
+    await supabaseClient.auth.signOut();
+    state.user = null;
+    state.cloudSyncActive = false;
+    setPasswordRecoveryMode(false);
+    showAuthGate();
+    updateAuthStatus("Your new password is saved. Sign in again with that password to get back on the road.", true);
+  } catch (error) {
+    updateAuthStatus(formatSupabaseError(error, "We could not update your password just yet."), false);
+  }
 }
 
 function resetSessionForNewGame() {
@@ -1463,6 +1644,9 @@ function bindOverlayControls() {
     authEmailInput,
     authPasswordInput,
     authRacerNameInput,
+    forgotPasswordButton,
+    resetPasswordButton,
+    cancelResetPasswordButton,
     vehicleOptions,
     signInButton,
     signUpButton,
@@ -1562,6 +1746,21 @@ function bindOverlayControls() {
       } catch (error) {
         updateAuthStatus(formatSupabaseError(error, "Could not sign up."), false);
       }
+    });
+  }
+
+  if (forgotPasswordButton) {
+    bindElementOnce(forgotPasswordButton, "ForgotPasswordClick", "click", sendPasswordReset);
+  }
+
+  if (resetPasswordButton) {
+    bindElementOnce(resetPasswordButton, "ResetPasswordClick", "click", completePasswordReset);
+  }
+
+  if (cancelResetPasswordButton) {
+    bindElementOnce(cancelResetPasswordButton, "CancelResetPasswordClick", "click", () => {
+      setPasswordRecoveryMode(false);
+      updateAuthStatus("Sign in to keep your racer profile and best score updated, or play as a guest.", true);
     });
   }
 
@@ -2059,41 +2258,71 @@ function createScoreCardImage() {
   canvas.height = 1920;
   const ctx = canvas.getContext("2d");
   const scoreCardHighScore = Math.max(state.bestScore, state.score);
-  const scoreCardVehicle = state.bestScoreVehicle || state.selectedVehicle;
-  const scoreCardLevel = Math.max(1, Number(state.bestScoreLevel) || 1);
+  const useCurrentRunDetails = state.score >= state.bestScore;
+  const scoreCardBackgroundLevel = Math.max(1, Number(state.level) || 1);
+  const isWaterCard = scoreCardBackgroundLevel >= 4;
+  const scoreCardVehicle = useCurrentRunDetails
+    ? state.selectedVehicle
+    : (state.bestScoreVehicle || state.selectedVehicle);
+  const scoreCardLevel = useCurrentRunDetails
+    ? state.level
+    : Math.max(1, Number(state.bestScoreLevel) || 1);
 
-  drawScoreCardBackground(ctx, scoreCardLevel, canvas.width, canvas.height);
+  drawScoreCardBackground(ctx, scoreCardBackgroundLevel, canvas.width, canvas.height);
 
-  ctx.fillStyle = "rgba(7, 17, 28, 0.54)";
+  ctx.fillStyle = isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.54)";
   ctx.fillRect(40, 40, 1000, 1840);
-  ctx.strokeStyle = "rgba(115, 239, 255, 0.34)";
+  ctx.strokeStyle = isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
   ctx.lineWidth = 8;
   ctx.strokeRect(40, 40, 1000, 1840);
 
-  ctx.fillStyle = "rgba(7, 17, 28, 0.58)";
+  ctx.fillStyle = isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(7, 17, 28, 0.58)";
   ctx.fillRect(110, 90, 860, 200);
-  ctx.strokeStyle = "rgba(115, 239, 255, 0.32)";
+  ctx.strokeStyle = isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
   ctx.lineWidth = 5;
   ctx.strokeRect(110, 90, 860, 200);
 
-  ctx.fillStyle = "#232323";
-  ctx.fillRect(250, 270, 580, 1410);
-  ctx.fillStyle = "#d7d7d7";
-  ctx.fillRect(235, 270, 15, 1410);
-  ctx.fillRect(830, 270, 15, 1410);
-  ctx.fillStyle = "#ffe66d";
-  for (let y = 310; y < 1620; y += 180) {
-    ctx.fillRect(535, y, 10, 90);
+  if (isWaterCard) {
+    ctx.fillStyle = "rgba(10, 108, 163, 0.08)";
+    ctx.fillRect(120, 300, 840, 1320);
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.lineWidth = 7;
+    for (let y = 340; y < 1660; y += 120) {
+      ctx.beginPath();
+      ctx.moveTo(110, y);
+      ctx.bezierCurveTo(280, y - 26, 460, y + 18, 650, y - 10);
+      ctx.bezierCurveTo(790, y - 26, 900, y + 12, 980, y - 8);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.09)";
+    ctx.beginPath();
+    ctx.ellipse(230, 310, 120, 24, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "#232323";
+    ctx.fillRect(250, 270, 580, 1410);
+    ctx.fillStyle = "#d7d7d7";
+    ctx.fillRect(235, 270, 15, 1410);
+    ctx.fillRect(830, 270, 15, 1410);
+    ctx.fillStyle = "#ffe66d";
+    for (let y = 310; y < 1620; y += 180) {
+      ctx.fillRect(535, y, 10, 90);
+    }
   }
 
   drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");
   drawThreeDText(ctx, "High Score Card", 540, 236, "34px Verdana", "#cfd8dc", "rgba(3, 10, 18, 0.7)", "rgba(255, 255, 255, 0.08)");
 
-  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
+  ctx.fillStyle = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.72)";
   ctx.fillRect(160, 390, 760, 190);
   drawFittedCenteredThreeDText(ctx, state.racerName, 540, 485, 680, 108, 54, "#73efff", "rgba(2, 9, 18, 0.82)", "rgba(115, 239, 255, 0.18)");
 
-  ctx.fillStyle = "rgba(8, 18, 28, 0.72)";
+  ctx.fillStyle = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.72)";
   ctx.fillRect(160, 620, 760, 340);
   drawThreeDText(ctx, "Highest Score", 540, 735, "bold 60px Verdana", "#ffd166", "rgba(61, 31, 0, 0.75)", "rgba(255, 209, 102, 0.12)");
   drawThreeDText(ctx, String(scoreCardHighScore), 540, 875, "bold 210px Verdana", "#ffffff", "rgba(3, 10, 18, 0.82)", "rgba(255, 255, 255, 0.12)");
@@ -3080,11 +3309,6 @@ async function handleVehicleCrash() {
     return;
   }
 
-  if (state.level >= 4) {
-    endGame("Shipwreck!");
-    return;
-  }
-
   if (state.livesRemaining > 0) {
     state.livesRemaining -= 1;
     state.reviveRunning = true;
@@ -3133,7 +3357,7 @@ async function handleVehicleCrash() {
     return;
   }
 
-  endGame();
+  endGame(state.level >= 4 ? "Shipwreck!" : "Crash!");
 }
 
 function isColliding(a, b) {

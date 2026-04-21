@@ -88,6 +88,21 @@
                 <button id="signInButton" class="auth-button secondary" type="button">Sign In</button>
                 <button id="signUpButton" class="auth-button primary" type="button">Sign Up</button>
               </div>
+              <button id="forgotPasswordButton" class="auth-button tertiary" type="button">Forgot Password?</button>
+              <div id="passwordResetPanel" class="guest-unlock-panel hidden">
+                <label class="field">
+                  <span>New Password</span>
+                  <input id="resetPasswordInput" type="password" minlength="6" placeholder="Enter your new password" autocomplete="new-password">
+                </label>
+                <label class="field">
+                  <span>Confirm New Password</span>
+                  <input id="resetPasswordConfirmInput" type="password" minlength="6" placeholder="Confirm your new password" autocomplete="new-password">
+                </label>
+                <div class="auth-actions compact">
+                  <button id="resetPasswordButton" class="auth-button primary" type="button">Update Password</button>
+                  <button id="cancelResetPasswordButton" class="auth-button secondary" type="button">Back</button>
+                </div>
+              </div>
               <button id="guestButton" class="auth-button tertiary" type="button">Play As Guest</button>
               <div id="guestUnlockPanel" class="guest-unlock-panel hidden">
                 <label class="field">
