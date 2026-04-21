@@ -2264,44 +2264,6 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
 function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.clearRect(0, 0, width, height);
 
-  const drawScoreCardStreetLights = (roadLeft, roadWidth, tint = "rgba(255, 236, 176, 0.92)", poleTint = "rgba(215, 225, 235, 0.72)") => {
-    const leftX = roadLeft - 80;
-    const rightX = roadLeft + roadWidth + 80;
-    for (let y = 130; y < height; y += 170) {
-      ctx.strokeStyle = poleTint;
-      ctx.lineWidth = 6;
-
-      ctx.beginPath();
-      ctx.moveTo(leftX, y + 28);
-      ctx.lineTo(leftX, y + 120);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(leftX, y + 28);
-      ctx.lineTo(leftX + 34, y + 28);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(rightX, y + 28);
-      ctx.lineTo(rightX, y + 120);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(rightX, y + 28);
-      ctx.lineTo(rightX - 34, y + 28);
-      ctx.stroke();
-
-      ctx.fillStyle = tint;
-      ctx.shadowColor = tint;
-      ctx.shadowBlur = 22;
-      ctx.beginPath();
-      ctx.arc(leftX + 34, y + 28, 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(rightX - 34, y + 28, 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-  };
-
   if (levelNumber === 2) {
     const muddyGradient = ctx.createLinearGradient(0, 0, 0, height);
     muddyGradient.addColorStop(0, "#5b4333");
@@ -2322,7 +2284,6 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.strokeStyle = "rgba(237, 221, 199, 0.42)";
     ctx.lineWidth = 18;
     ctx.strokeRect(166, -2, 748, height + 4);
-    drawScoreCardStreetLights(160, 760, "rgba(255, 223, 163, 0.88)", "rgba(214, 191, 170, 0.68)");
     return;
   }
 
@@ -2358,7 +2319,6 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.beginPath();
     ctx.ellipse(860, height - 28, 280, 100, 0, 0, Math.PI * 2);
     ctx.fill();
-    drawScoreCardStreetLights(180, 720, "rgba(255, 241, 188, 0.9)", "rgba(214, 228, 240, 0.68)");
     return;
   }
 
@@ -2406,19 +2366,20 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
   }
 
   const roadGradient = ctx.createLinearGradient(0, 0, 0, height);
-  roadGradient.addColorStop(0, "#0f2746");
-  roadGradient.addColorStop(1, "#050b14");
+  roadGradient.addColorStop(0, "#8fd6ff");
+  roadGradient.addColorStop(0.34, "#bfe9ff");
+  roadGradient.addColorStop(1, "#f0fbff");
   ctx.fillStyle = roadGradient;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = "rgba(255, 209, 102, 0.08)";
+  ctx.fillStyle = "rgba(255, 241, 188, 0.24)";
   ctx.beginPath();
   ctx.arc(860, 260, 260, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(16, 23, 32, 0.38)";
+  ctx.fillStyle = "rgba(70, 70, 70, 0.86)";
   ctx.fillRect(160, 0, 760, height);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+  ctx.strokeStyle = "rgba(245, 250, 255, 0.5)";
   ctx.lineWidth = 16;
   ctx.strokeRect(168, -2, 744, height + 4);
 
@@ -2430,7 +2391,6 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.lineTo(width / 2, height);
   ctx.stroke();
   ctx.setLineDash([]);
-  drawScoreCardStreetLights(160, 760);
 }
 
 function createScoreCardImage() {
@@ -2563,10 +2523,6 @@ function getAudioContext() {
 }
 
 async function ensureAudioReady() {
-  if (!anySoundEnabled()) {
-    return null;
-  }
-
   const context = getAudioContext();
   if (!context) {
     return null;

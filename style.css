@@ -23,8 +23,9 @@ body {
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top, rgba(255, 209, 102, 0.12), transparent 28%),
-    linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.3), transparent 16%),
+    radial-gradient(circle at 82% 16%, rgba(255, 232, 163, 0.2), transparent 18%),
+    linear-gradient(180deg, #8fd6ff 0%, #bde9ff 36%, #e9f8ff 100%);
 }
 
 body.level-2 {
@@ -250,7 +251,8 @@ body:not(.is-playing) .hud-actions .start-button {
   border-right: 0;
   border-radius: 0;
   background:
-    linear-gradient(90deg, #1e1e1e 0 25%, #262626 25% 50%, #2d2d2d 50% 75%, #232323 75% 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    linear-gradient(90deg, #3d3d3d 0 25%, #464646 25% 50%, #505050 50% 75%, #3f3f3f 75% 100%);
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.35);
 }
 
@@ -302,41 +304,6 @@ body.is-playing .game-area {
 
 .game-area.level-5 .road-line {
   opacity: 0;
-}
-
-.game-area.level-1::before,
-.game-area.level-1::after,
-.game-area.level-2::before,
-.game-area.level-2::after,
-.game-area.level-3::before,
-.game-area.level-3::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 74px;
-  pointer-events: none;
-  z-index: 1;
-  background-repeat: repeat-y;
-  background-size: 74px 170px;
-}
-
-.game-area.level-1::before,
-.game-area.level-2::before,
-.game-area.level-3::before {
-  left: 0;
-  background-image:
-    radial-gradient(circle at 28px 30px, rgba(255, 236, 176, 0.95) 0 8px, rgba(255, 236, 176, 0.18) 9px 24px, transparent 25px),
-    linear-gradient(90deg, transparent 26px, rgba(208, 222, 235, 0.72) 26px 30px, transparent 30px);
-}
-
-.game-area.level-1::after,
-.game-area.level-2::after,
-.game-area.level-3::after {
-  right: 0;
-  background-image:
-    radial-gradient(circle at 46px 30px, rgba(255, 236, 176, 0.95) 0 8px, rgba(255, 236, 176, 0.18) 9px 24px, transparent 25px),
-    linear-gradient(90deg, transparent 44px, rgba(208, 222, 235, 0.72) 44px 48px, transparent 48px);
 }
 
 .game-area.level-4::before,
