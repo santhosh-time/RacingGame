@@ -154,6 +154,7 @@ const state = {
   authView: "choice",
   guestReadyVehicle: "",
   entryReady: false,
+  lastFrameTime: 0,
 };
 
 const audioState = {
@@ -176,7 +177,7 @@ function syncGameBounds() {
 }
 
 function updateBestScoreDisplay() {
-  bestScoreDisplay.textContent = String(state.bestScore);
+  bestScoreDisplay.textContent = String(Math.floor(state.bestScore));
 }
 
 function updateLevelDisplay() {
@@ -236,6 +237,17 @@ function getCurrentKmph() {
   const metersPerPixel = visibleRoadLengthMeters / gameBounds.height;
   const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
   return Math.round(metersPerSecond * 3.6);
+}
+
+function getDeltaFrames(frameTime) {
+  if (!state.lastFrameTime) {
+    state.lastFrameTime = frameTime;
+    return 1;
+  }
+
+  const elapsedMs = Math.max(0, frameTime - state.lastFrameTime);
+  state.lastFrameTime = frameTime;
+  return Math.max(0.5, Math.min(2.5, elapsedMs / (1000 / targetFramesPerSecond)));
 }
 
 function overlayRefs() {
@@ -1709,6 +1721,7 @@ function resetSessionForNewGame() {
   state.fuelPercent = 100;
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
+  state.lastFrameTime = 0;
   state.playerX = middleLaneX();
   scoreDisplay.textContent = "0";
   updateBestScoreDisplay();
@@ -1970,8 +1983,10 @@ function bindOverlayControls() {
 }
 
 function maybeUpdateBestScore() {
-  if (state.score > state.bestScore) {
-    state.bestScore = state.score;
+  const currentScore = Math.floor(state.score);
+
+  if (currentScore > state.bestScore) {
+    state.bestScore = currentScore;
     state.bestScoreVehicle = state.selectedVehicle;
     state.bestScoreLevel = state.level;
     updateBestScoreDisplay();
@@ -2347,8 +2362,9 @@ function createScoreCardImage() {
   canvas.width = 1080;
   canvas.height = 1920;
   const ctx = canvas.getContext("2d");
-  const scoreCardHighScore = Math.max(state.bestScore, state.score);
-  const useCurrentRunDetails = state.score >= state.bestScore;
+  const currentRunScore = Math.floor(state.score);
+  const scoreCardHighScore = Math.max(state.bestScore, currentRunScore);
+  const useCurrentRunDetails = currentRunScore >= state.bestScore;
   const scoreCardBackgroundLevel = Math.max(1, Number(state.level) || 1);
   const isWaterCard = scoreCardBackgroundLevel >= 4;
   const scoreCardVehicle = useCurrentRunDetails
@@ -3276,8 +3292,9 @@ async function beginLevel(levelNumber) {
   updateWaterSound();
   state.active = true;
   state.pendingTransition = false;
+  state.lastFrameTime = performance.now();
   syncGameplayChrome();
-  gameLoop();
+  gameLoop(state.lastFrameTime);
 }
 
 function adminLevelStartScore(levelNumber) {
@@ -3322,6 +3339,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.fuelPercent = 100;
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
+  state.lastFrameTime = 0;
   state.enemyRespawns = 0;
   state.restartLevel = levelNumber;
   state.restartVehicle = state.selectedVehicle;
@@ -3336,7 +3354,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   clearBooster();
   state.pickupType = "";
   playerCar.style.left = `${state.playerX}px`;
-  scoreDisplay.textContent = String(startScore);
+  scoreDisplay.textContent = String(Math.floor(startScore));
   updateLevelDisplay();
   updateLivesDisplay();
   updateFuelDisplay();
@@ -3384,10 +3402,10 @@ function setControlState(controlName, pressed) {
   }
 }
 
-function updateRoadLines() {
+function updateRoadLines(deltaFrames = 1) {
   roadLines.forEach((line, index) => {
     const currentTop = parseFloat(line.style.top || line.offsetTop);
-    let nextTop = currentTop + state.currentSpeed;
+    let nextTop = currentTop + state.currentSpeed * deltaFrames;
     if (nextTop > gameBounds.height) {
       nextTop = -100;
     }
@@ -3396,12 +3414,12 @@ function updateRoadLines() {
   });
 }
 
-function updatePlayer() {
+function updatePlayer(deltaFrames = 1) {
   if (state.keys.ArrowLeft) {
-    state.playerX -= 9;
+    state.playerX -= 9 * deltaFrames;
   }
   if (state.keys.ArrowRight) {
-    state.playerX += 9;
+    state.playerX += 9 * deltaFrames;
   }
 
   state.playerX = clampVehicleLeft(state.playerX, vehicleWidth());
@@ -3461,8 +3479,9 @@ async function handleVehicleCrash() {
     state.active = true;
     state.pendingTransition = false;
     state.reviveRunning = false;
+    state.lastFrameTime = performance.now();
     syncGameplayChrome();
-    gameLoop();
+    gameLoop(state.lastFrameTime);
     return;
   }
 
@@ -3497,15 +3516,15 @@ function isColliding(a, b) {
   );
 }
 
-function updateEnemies() {
+function updateEnemies(deltaFrames = 1) {
   const laserActive = Date.now() < state.laserActiveUntil;
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
     const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
     const respawnTop = state.level >= 4 ? -140 : -220;
     const movementStep = state.level >= 4
-      ? Math.max(2.2, state.currentSpeed * 0.58)
-      : state.currentSpeed + 1.2;
+      ? Math.max(2.2, state.currentSpeed * 0.58) * deltaFrames
+      : (state.currentSpeed + 1.2) * deltaFrames;
     let nextTop = top + movementStep;
 
     if (nextTop > gameBounds.height) {
@@ -3568,7 +3587,7 @@ function updateEnemies() {
   }
 }
 
-function updateBarricades() {
+function updateBarricades(deltaFrames = 1) {
   if (state.level !== 2) {
     clearBarricades();
     return;
@@ -3577,7 +3596,7 @@ function updateBarricades() {
   const laserActive = Date.now() < state.laserActiveUntil;
   state.barricades = state.barricades.filter((barricade) => {
     const currentTop = parseFloat(barricade.style.top);
-    const nextTop = currentTop + state.currentSpeed + 0.9;
+    const nextTop = currentTop + (state.currentSpeed + 0.9) * deltaFrames;
 
     if (nextTop > gameBounds.height) {
       barricade.remove();
@@ -3601,7 +3620,7 @@ function updateBarricades() {
   });
 }
 
-function updateBooster() {
+function updateBooster(deltaFrames = 1) {
   if (!state.pickup) {
     return;
   }
@@ -3609,7 +3628,7 @@ function updateBooster() {
   updateBoosterLaneSafety();
 
   const top = parseFloat(state.pickup.style.top);
-  let nextTop = top + state.currentSpeed + 0.8;
+  let nextTop = top + (state.currentSpeed + 0.8) * deltaFrames;
 
   if (nextTop > gameBounds.height) {
     clearBooster();
@@ -3631,29 +3650,30 @@ function updateBooster() {
   }
 }
 
-async function gameLoop() {
+async function gameLoop(frameTime = performance.now()) {
   if (!state.active) {
     return;
   }
+  const deltaFrames = getDeltaFrames(frameTime);
 
   syncGameBounds();
   updateSpeedRamp();
   refreshSpeed();
-  updateRoadLines();
-  updatePlayer();
+  updateRoadLines(deltaFrames);
+  updatePlayer(deltaFrames);
   updatePlayerInvincibility();
   spawnBooster();
   spawnBarricades();
-  updateEnemies();
-  updateBarricades();
-  updateBooster();
+  updateEnemies(deltaFrames);
+  updateBarricades(deltaFrames);
+  updateBooster(deltaFrames);
   updateLaserPointer();
   updateEngineSound();
   updateWaterSound();
 
-  state.score += 1;
+  state.score += deltaFrames;
   handleFuelDrain();
-  scoreDisplay.textContent = String(state.score);
+  scoreDisplay.textContent = String(Math.floor(state.score));
 
   if (state.level === 1 && (getCurrentKmph() > 120 || state.score >= 8000) && !state.pendingTransition) {
     beginLevel(2);
@@ -3724,7 +3744,7 @@ function endGame(title = "Crash!") {
     <div class="game-over-panel">
       <h2>Game Over</h2>
       <p>${title}</p>
-      <p>${state.racerName}, your run scored ${state.score}.</p>
+      <p>${state.racerName}, your run scored ${Math.floor(state.score)}.</p>
       <p>Highest score this session: ${state.bestScore}</p>
       <div class="auth-actions">
         <button id="downloadScoreCardButton" class="auth-button primary" type="button">Save Score Card</button>
