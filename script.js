@@ -14,7 +14,6 @@ const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
 const laserPointer = document.getElementById("laserPointer");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
-const touchTapButtons = Array.from(document.querySelectorAll("[data-touch-tap]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
 const initialMessageMarkup = message.innerHTML;
 const initialPageUrl = window.location.href;
@@ -109,10 +108,9 @@ const state = {
   keys: {
     ArrowLeft: false,
     ArrowRight: false,
-    ArrowDown: false,
   },
   enemies: [],
-  nextBoosterScore: 1000,
+  nextBoosterScore: 2000,
   animationId: 0,
   soundEnabled: true,
   supabaseReady: false,
@@ -151,6 +149,7 @@ const state = {
   accessValidUntil: "",
   accessBusy: false,
   pendingPaymentOrderId: "",
+  pendingDonationOrderId: "",
   adminUnlocked: false,
   adminSelectedLevel: 1,
   restartLevel: 1,
@@ -257,10 +256,9 @@ function overlayRefs() {
     cancelResetPasswordButton: document.getElementById("cancelResetPasswordButton"),
     sessionModeText: document.getElementById("sessionModeText"),
     cloudStatus: document.getElementById("cloudStatus"),
-    accessPanel: document.getElementById("accessPanel"),
-    accessStatus: document.getElementById("accessStatus"),
-    payAccessButton: document.getElementById("payAccessButton"),
-    refreshAccessButton: document.getElementById("refreshAccessButton"),
+    supportPanel: document.getElementById("supportPanel"),
+    supportDonationAmountInput: document.getElementById("supportDonationAmountInput"),
+    supportDonationButton: document.getElementById("supportDonationButton"),
     profileNameInput: document.getElementById("profileNameInput"),
     saveProfileButton: document.getElementById("saveProfileButton"),
     signOutButton: document.getElementById("signOutButton"),
@@ -287,6 +285,9 @@ function overlayRefs() {
     signInButton: document.getElementById("signInButton"),
     signUpButton: document.getElementById("signUpButton"),
     guestButton: document.getElementById("guestButton"),
+    guestDonationPanel: document.getElementById("guestDonationPanel"),
+    guestDonationAmountInput: document.getElementById("guestDonationAmountInput"),
+    guestDonationButton: document.getElementById("guestDonationButton"),
     guestUnlockPanel: document.getElementById("guestUnlockPanel"),
     guestUnlockInput: document.getElementById("guestUnlockInput"),
     guestUnlockButton: document.getElementById("guestUnlockButton"),
@@ -730,6 +731,20 @@ function formatPaymentError(error) {
   }
 
   return "We could not activate your 24-hour pass right now. Try again in a moment.";
+}
+
+function formatDonationError(error) {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (message.includes("failed to send a request to the edge function")) {
+    return "The donation lane is not live yet. Give it a moment and try again.";
+  }
+
+  if (message.includes("payment cancelled")) {
+    return "Donation was cancelled before it was completed.";
+  }
+
+  return "We could not complete the donation right now. Try again in a moment.";
 }
 
 async function readFunctionErrorMessage(error, fallbackMessage) {
@@ -1223,6 +1238,152 @@ async function openPaidAccessCheckout() {
   }
 }
 
+async function openDonationCheckout(options = {}) {
+  if (!supabaseClient) {
+    if (options.signedIn) {
+      updateCloudStatus("Donation is not ready yet. Reload the game and try again.", false);
+    } else {
+      updateAuthStatus("Donation is not ready yet. Reload the game and try again.", false);
+    }
+    return;
+  }
+
+  if (typeof window.Razorpay !== "function") {
+    if (options.signedIn) {
+      updateCloudStatus("The donation gate is not ready yet. Reload and try again.", false);
+    } else {
+      updateAuthStatus("The donation gate is not ready yet. Reload and try again.", false);
+    }
+    return;
+  }
+
+  const {
+    guestDonationAmountInput,
+    guestDonationButton,
+    supportDonationAmountInput,
+    supportDonationButton,
+    authEmailInput,
+    authRacerNameInput,
+  } = overlayRefs();
+  const isSignedInSupport = Boolean(options.signedIn);
+  const donationAmountInput = isSignedInSupport ? supportDonationAmountInput : guestDonationAmountInput;
+  const donationButton = isSignedInSupport ? supportDonationButton : guestDonationButton;
+  const updateDonationStatus = (messageText, isReady = false) => {
+    if (isSignedInSupport) {
+      updateCloudStatus(messageText, isReady);
+    } else {
+      updateAuthStatus(messageText, isReady);
+    }
+  };
+  const amountRupees = Number(donationAmountInput?.value || 0);
+  const amountPaise = Math.round(amountRupees * 100);
+  const donorEmail = state.user?.email || authEmailInput?.value?.trim() || "";
+  const donorName = isSignedInSupport
+    ? (state.racerName || "Road Rider")
+    : (authRacerNameInput?.value?.trim() || "Guest Racer");
+
+  if (!Number.isFinite(amountRupees) || amountRupees < 1) {
+    updateDonationStatus("Enter a donation amount of at least Rs.1.", false);
+    return;
+  }
+
+  if (donationButton) {
+    donationButton.disabled = true;
+  }
+
+  updateDonationStatus("Opening the donation lane...", false);
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("create-donation-order", {
+      body: {
+        amountPaise,
+        donorName,
+        donorEmail,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const checkout = new window.Razorpay({
+      key: data.keyId,
+      amount: data.amount,
+      currency: data.currency,
+      name: "Viral Racing Game",
+      description: "Support donation",
+      order_id: data.orderId,
+      handler: async (response) => {
+        state.pendingDonationOrderId = "";
+        try {
+          const { error: verifyError } = await supabaseClient.functions.invoke("verify-donation-payment", {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            },
+          });
+
+          if (verifyError) {
+            throw verifyError;
+          }
+
+          updateDonationStatus(`Thank you, ${donorName}. Your donation helps keep the game moving.`, true);
+        } catch (verificationError) {
+          updateDonationStatus(
+            await readFunctionErrorMessage(
+              verificationError,
+              "We received the donation attempt, but could not confirm it just yet.",
+            ),
+            false,
+          );
+          console.error("Razorpay donation verify error:", verificationError);
+        } finally {
+          if (donationButton) {
+            donationButton.disabled = false;
+          }
+        }
+      },
+      prefill: {
+        email: donorEmail,
+        name: donorName,
+      },
+      theme: {
+        color: "#83f0b2",
+      },
+      modal: {
+        ondismiss: () => {
+          state.pendingDonationOrderId = "";
+          if (donationButton) {
+            donationButton.disabled = false;
+          }
+          updateDonationStatus(
+            isSignedInSupport
+              ? "Donation window closed. You can keep racing anytime."
+              : "Donation window closed. You can still jump in as a guest anytime.",
+            true,
+          );
+        },
+      },
+    });
+
+    state.pendingDonationOrderId = data.orderId;
+    checkout.open();
+  } catch (error) {
+    updateDonationStatus(
+      await readFunctionErrorMessage(
+        error,
+        formatDonationError(error),
+      ),
+      false,
+    );
+    console.error("Razorpay donation create order error:", error);
+    if (donationButton) {
+      donationButton.disabled = false;
+    }
+  }
+}
+
 async function deletePlayerData() {
   if (!state.user || !supabaseClient) {
     return;
@@ -1357,8 +1518,6 @@ function updateProfileInputs() {
     saveProfileButton,
     signOutButton,
     deleteProfileButton,
-    payAccessButton,
-    refreshAccessButton,
   } = overlayRefs();
   if (profileNameInput) {
     profileNameInput.value = isGuestRacerName() ? "" : state.racerName;
@@ -1374,36 +1533,6 @@ function updateProfileInputs() {
   if (deleteProfileButton) {
     deleteProfileButton.disabled = !state.user;
   }
-  if (payAccessButton) {
-    payAccessButton.disabled = !state.user || state.accessBusy;
-  }
-  if (refreshAccessButton) {
-    refreshAccessButton.disabled = !state.user || state.accessBusy;
-  }
-}
-
-function guideToPaidAccess() {
-  const { vehicleSetup, accessPanel, payAccessButton } = overlayRefs();
-  if (vehicleSetup?.classList.contains("hidden")) {
-    showVehicleSetup();
-  }
-
-  updateAccessUI();
-
-  if (accessPanel) {
-    accessPanel.classList.add("needs-attention");
-    accessPanel.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-    window.setTimeout(() => {
-      accessPanel.classList.remove("needs-attention");
-    }, 1800);
-  }
-
-  window.setTimeout(() => {
-    payAccessButton?.focus();
-  }, 250);
 }
 
 function showVehicleSetup() {
@@ -1499,7 +1628,6 @@ async function handleSessionChange(session) {
 
   updateAuthStatus(`Welcome back, ${state.racerName}.`, true);
   await loadProfile();
-  await loadAccessPass();
   showVehicleSetup();
 }
 
@@ -1651,6 +1779,8 @@ function bindOverlayControls() {
     signInButton,
     signUpButton,
     guestButton,
+    guestDonationButton,
+    supportDonationButton,
     guestUnlockInput,
     guestUnlockButton,
     saveProfileButton,
@@ -1770,6 +1900,14 @@ function bindOverlayControls() {
     });
   }
 
+  if (guestDonationButton) {
+    bindElementOnce(guestDonationButton, "GuestDonateClick", "click", () => openDonationCheckout());
+  }
+
+  if (supportDonationButton) {
+    bindElementOnce(supportDonationButton, "SupportDonateClick", "click", () => openDonationCheckout({ signedIn: true }));
+  }
+
   if (guestUnlockButton) {
     bindElementOnce(guestUnlockButton, "GuestUnlockClick", "click", unlockUnlimitedGuestMode);
   }
@@ -1805,14 +1943,6 @@ function bindOverlayControls() {
 
   if (sendFeedbackButton) {
     bindElementOnce(sendFeedbackButton, "FeedbackSendClick", "click", submitFeedback);
-  }
-
-  if (payAccessButton) {
-    bindElementOnce(payAccessButton, "PayAccessClick", "click", openPaidAccessCheckout);
-  }
-
-  if (refreshAccessButton) {
-    bindElementOnce(refreshAccessButton, "RefreshAccessClick", "click", loadAccessPass);
   }
 
   if (adminToggleButton) {
@@ -2881,7 +3011,7 @@ function spawnBooster() {
     if (state.score >= state.nextBoosterScore) {
       state.pickupType = "booster";
       state.pickup = createPickup(boosterSpawnTop, "booster");
-      state.nextBoosterScore += 1000;
+      state.nextBoosterScore += 2000;
     }
     return;
   }
@@ -2932,11 +3062,6 @@ function addBoostLevel() {
   state.boostLevel += 1;
   refreshSpeed();
   playBoosterSound();
-}
-
-function removeBoostLevel() {
-  state.boostLevel = Math.max(0, state.boostLevel - 1);
-  refreshSpeed();
 }
 
 function updateSpeedRamp() {
@@ -3125,7 +3250,7 @@ async function beginLevel(levelNumber) {
     state.baseSpeed = 2.6;
     state.baseSpeedTarget = levelOneBaseSpeed;
     state.boostLevel = 0;
-    state.nextBoosterScore = Math.max(1000, state.score + 1000);
+    state.nextBoosterScore = Math.max(2000, state.score + 2000);
     state.nextLaserScore = 1000;
     state.nextFuelScore = 8700;
     state.nextFuelDrainScore = 9000;
@@ -3205,7 +3330,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.currentSpeed = levelOneBaseSpeed;
   state.boostLevel = 0;
   state.playerX = middleLaneX();
-  state.nextBoosterScore = 1000;
+  state.nextBoosterScore = 2000;
   state.nextLaserScore = 2000;
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
@@ -3321,6 +3446,9 @@ async function handleVehicleCrash() {
     resetEnemies();
     clearBarricades();
     clearBooster();
+    state.baseSpeed = 0;
+    state.currentSpeed = 0;
+    refreshSpeed();
     updateLivesDisplay();
     playCrashSound();
     message.innerHTML = `
@@ -3588,12 +3716,6 @@ async function startGame() {
 
   startButton.blur();
 
-  if (state.user && !state.accessActive) {
-    updateCloudStatus("Your profile is ready, but your 24-hour pass is not active yet. Pay Rs.1 to unlock signed-in play.", false);
-    guideToPaidAccess();
-    return;
-  }
-
   if (!state.user) {
     if (isGuestLimitReached()) {
       showAuthGate();
@@ -3715,10 +3837,6 @@ window.addEventListener("keydown", (event) => {
     setControlState(event.key, true);
     event.preventDefault();
   }
-
-  if (event.key === "ArrowDown") {
-    removeBoostLevel();
-  }
 });
 
 window.addEventListener("keyup", (event) => {
@@ -3745,16 +3863,6 @@ touchHoldButtons.forEach((button) => {
   button.addEventListener("pointerup", pressEnd);
   button.addEventListener("pointerleave", pressEnd);
   button.addEventListener("pointercancel", pressEnd);
-});
-
-touchTapButtons.forEach((button) => {
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-
-    if (button.dataset.touchTap === "ArrowDown") {
-      removeBoostLevel();
-    }
-  });
 });
 
 ["pointerdown", "touchstart"].forEach((eventName) => {

@@ -104,6 +104,17 @@
                 </div>
               </div>
               <button id="guestButton" class="auth-button tertiary" type="button">Play As Guest</button>
+              <div id="guestDonationPanel" class="guest-donation-panel">
+                <p class="guest-donation-title">Support The Game</p>
+                <p class="guest-donation-copy">If you love the game, you can donate and support The Viral Alien game.</p>
+                <div class="guest-donation-row">
+                  <label class="field">
+                    <span>Donation Amount (Rs.)</span>
+                    <input id="guestDonationAmountInput" type="number" min="1" step="1" value="10" placeholder="Enter amount">
+                  </label>
+                  <button id="guestDonationButton" class="auth-button primary" type="button">Donate</button>
+                </div>
+              </div>
               <div id="guestUnlockPanel" class="guest-unlock-panel hidden">
                 <label class="field">
                   <span>Guest Unlock Code</span>
@@ -194,12 +205,16 @@
               </section>
             </div>
 
-            <p>Use Left and Right to dodge, Down to remove one boost level.</p>
-            <div id="accessPanel" class="access-panel hidden">
-              <p id="accessStatus" class="access-status">Checking your 24-hour pass...</p>
-              <div class="auth-actions compact">
-                <button id="payAccessButton" class="auth-button primary" type="button">Pay Rs.1 for 24 Hours</button>
-                <button id="refreshAccessButton" class="auth-button secondary" type="button">Check My Pass</button>
+            <p>Use Left and Right to dodge through traffic and hazards.</p>
+            <div id="supportPanel" class="guest-donation-panel">
+              <p class="guest-donation-title">Support The Game</p>
+              <p class="guest-donation-copy">If you love the game, you can donate and support The Viral Alien game.</p>
+              <div class="guest-donation-row">
+                <label class="field">
+                  <span>Donation Amount (Rs.)</span>
+                  <input id="supportDonationAmountInput" type="number" min="1" step="1" value="10" placeholder="Enter amount">
+                </label>
+                <button id="supportDonationButton" class="auth-button primary" type="button">Donate</button>
               </div>
             </div>
             <div class="account-secondary-actions">
@@ -268,7 +283,6 @@
 
       <div class="touch-controls">
         <button class="touch-button steer-button" data-touch-control="ArrowLeft" aria-label="Move left">Left</button>
-        <button class="touch-button boost-button" data-touch-tap="ArrowDown" aria-label="Reduce boost">Down</button>
         <button class="touch-button steer-button" data-touch-control="ArrowRight" aria-label="Move right">Right</button>
       </div>
     </section>
