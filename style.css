@@ -79,6 +79,7 @@ body:not(.is-playing) .hud {
 
 body.is-playing {
   place-items: stretch;
+  overflow: hidden;
 }
 
 body.is-playing .app {
@@ -818,9 +819,15 @@ body.is-playing .game-area {
 }
 
 .entry-choice-panel {
-  width: 100%;
+  width: min(100%, 320px);
   display: grid;
   gap: 12px;
+  justify-items: center;
+}
+
+.entry-choice-panel .auth-button,
+.auth-gate.choice-view .account-secondary-actions .auth-button {
+  width: 100%;
 }
 
 .auth-gate:not(.choice-view) .account-secondary-actions,
@@ -924,7 +931,7 @@ body.is-playing .game-area {
 }
 
 .account-secondary-actions {
-  width: 100%;
+  width: min(100%, 320px);
   display: grid;
   justify-items: center;
   gap: 10px;
@@ -946,7 +953,7 @@ body.is-playing .game-area {
 }
 
 .sign-in-form {
-  width: 100%;
+  width: min(100%, 320px);
   display: grid;
   gap: 12px;
 }
@@ -1022,7 +1029,7 @@ body.is-playing .game-area {
   min-height: 1.4em;
   font-size: 0.92rem;
   line-height: 1.45;
-  width: 100%;
+  width: min(100%, 320px);
 }
 
 .cloud-status {

@@ -3807,6 +3807,12 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("wheel", (event) => {
+  if (document.body.classList.contains("is-playing")) {
+    event.preventDefault();
+  }
+}, { passive: false });
+
 gameArea.addEventListener("mousemove", (event) => {
   updatePointerPosition(event.clientX, event.clientY);
 });
