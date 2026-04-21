@@ -1239,7 +1239,7 @@ body.is-playing .game-area {
 .touch-controls {
   width: min(88vw, 420px);
   display: none;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1324,9 +1324,9 @@ body.is-playing .game-area {
 
   .start-button {
     width: 100%;
-    min-height: 34px;
-    padding: 6px 8px;
-    font-size: 0.76rem;
+    min-height: 28px;
+    padding: 4px 6px;
+    font-size: 0.64rem;
   }
 
   .hud-actions {
@@ -1339,9 +1339,9 @@ body.is-playing .game-area {
 
   .sound-button {
     width: 100%;
-    min-height: 34px;
-    padding: 6px 8px;
-    font-size: 0.76rem;
+    min-height: 28px;
+    padding: 4px 6px;
+    font-size: 0.64rem;
   }
 
   .game-area {
