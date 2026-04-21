@@ -3675,7 +3675,7 @@ async function gameLoop(frameTime = performance.now()) {
   handleFuelDrain();
   scoreDisplay.textContent = String(Math.floor(state.score));
 
-  if (state.level === 1 && (getCurrentKmph() > 120 || state.score >= 8000) && !state.pendingTransition) {
+  if (state.level === 1 && (getCurrentKmph() >= 85 || state.score >= 8000) && !state.pendingTransition) {
     beginLevel(2);
     return;
   }
