@@ -48,6 +48,13 @@ body.level-4 {
     linear-gradient(180deg, #1f5d89, #1672a7 36%, #0b4b79 68%, #083659 100%);
 }
 
+body.level-5 {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.16), transparent 16%),
+    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.1), transparent 18%),
+    linear-gradient(180deg, #0a1930, #0b2343 24%, #0b3b63 56%, #072944 100%);
+}
+
 .app {
   width: 100vw;
   min-height: 100dvh;
@@ -280,12 +287,62 @@ body.is-playing .game-area {
   border-right-color: #b7e4ff;
 }
 
+.game-area.level-5 {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.12), transparent 14%),
+    radial-gradient(circle at 80% 14%, rgba(255, 255, 255, 0.08), transparent 16%),
+    linear-gradient(180deg, #091728 0 16%, #0b2440 16% 40%, #0a4168 40% 70%, #072b44 70% 100%);
+  border-left-color: #b7e4ff;
+  border-right-color: #b7e4ff;
+}
+
 .game-area.level-4 .road-line {
   opacity: 0;
 }
 
+.game-area.level-5 .road-line {
+  opacity: 0;
+}
+
+.game-area.level-1::before,
+.game-area.level-1::after,
+.game-area.level-2::before,
+.game-area.level-2::after,
+.game-area.level-3::before,
+.game-area.level-3::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 74px;
+  pointer-events: none;
+  z-index: 1;
+  background-repeat: repeat-y;
+  background-size: 74px 170px;
+}
+
+.game-area.level-1::before,
+.game-area.level-2::before,
+.game-area.level-3::before {
+  left: 0;
+  background-image:
+    radial-gradient(circle at 28px 30px, rgba(255, 236, 176, 0.95) 0 8px, rgba(255, 236, 176, 0.18) 9px 24px, transparent 25px),
+    linear-gradient(90deg, transparent 26px, rgba(208, 222, 235, 0.72) 26px 30px, transparent 30px);
+}
+
+.game-area.level-1::after,
+.game-area.level-2::after,
+.game-area.level-3::after {
+  right: 0;
+  background-image:
+    radial-gradient(circle at 46px 30px, rgba(255, 236, 176, 0.95) 0 8px, rgba(255, 236, 176, 0.18) 9px 24px, transparent 25px),
+    linear-gradient(90deg, transparent 44px, rgba(208, 222, 235, 0.72) 44px 48px, transparent 48px);
+}
+
 .game-area.level-4::before,
-.game-area.level-4::after {
+.game-area.level-4::after,
+.game-area.level-5::before,
+.game-area.level-5::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -293,7 +350,8 @@ body.is-playing .game-area {
   z-index: 1;
 }
 
-.game-area.level-4::before {
+.game-area.level-4::before,
+.game-area.level-5::before {
   background:
     radial-gradient(120% 18% at 10% 12%, rgba(255, 255, 255, 0.16) 0 18%, transparent 19%),
     radial-gradient(120% 16% at 62% 26%, rgba(255, 255, 255, 0.12) 0 16%, transparent 17%),
@@ -305,7 +363,13 @@ body.is-playing .game-area {
   animation: waterDrift 9s linear infinite;
 }
 
-.game-area.level-4::after {
+.game-area.level-5::before {
+  opacity: 0.75;
+  filter: brightness(0.82);
+}
+
+.game-area.level-4::after,
+.game-area.level-5::after {
   background:
     repeating-linear-gradient(
       180deg,
@@ -319,15 +383,32 @@ body.is-playing .game-area {
   animation: waterRipple 3.8s linear infinite;
 }
 
+.game-area.level-5::after {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(196, 231, 255, 0.14) 0 2px,
+      rgba(196, 231, 255, 0.02) 2px 16px,
+      rgba(7, 36, 60, 0.14) 16px 30px
+    );
+  opacity: 0.42;
+}
+
 .game-area.level-4 .vehicle,
 .game-area.level-4 .pickup,
 .game-area.level-4 .barricade,
-.game-area.level-4 .laser-pointer {
+.game-area.level-4 .laser-pointer,
+.game-area.level-5 .vehicle,
+.game-area.level-5 .pickup,
+.game-area.level-5 .barricade,
+.game-area.level-5 .laser-pointer {
   z-index: 2;
 }
 
 .game-area.level-4 .message,
-.game-area.level-4 .welcome-modal {
+.game-area.level-4 .welcome-modal,
+.game-area.level-5 .message,
+.game-area.level-5 .welcome-modal {
   z-index: 3;
 }
 
@@ -410,7 +491,7 @@ body.is-playing .game-area {
 }
 
 .welcome-sound-button {
-  min-width: 132px;
+  min-width: 190px;
 }
 
 .road-line {
@@ -869,6 +950,18 @@ body.is-playing .game-area {
 
 .game-over-panel p {
   max-width: 36ch;
+}
+
+.game-over-panel .auth-actions {
+  width: auto;
+  grid-template-columns: repeat(2, max-content);
+  justify-content: center;
+}
+
+.game-over-panel .auth-actions .auth-button {
+  width: auto;
+  min-width: 160px;
+  padding-inline: 18px;
 }
 
 .pause-panel {
@@ -1543,7 +1636,7 @@ body.is-playing .game-area {
   }
 
   .welcome-sound-button {
-    min-width: 104px;
+    min-width: 170px;
   }
 
   .message {

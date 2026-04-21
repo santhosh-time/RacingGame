@@ -7,7 +7,8 @@ const levelDisplay = document.getElementById("levelDisplay");
 const livesDisplay = document.getElementById("livesDisplay");
 const fuelCard = document.getElementById("fuelCard");
 const fuelDisplay = document.getElementById("fuelDisplay");
-const soundButton = document.getElementById("soundButton");
+const vehicleSoundButton = document.getElementById("vehicleSoundButton");
+const backgroundSoundButton = document.getElementById("backgroundSoundButton");
 const startButton = document.getElementById("startButton");
 const pauseButton = document.getElementById("pauseButton");
 const message = document.getElementById("message");
@@ -109,7 +110,9 @@ const state = {
   enemies: [],
   nextBoosterScore: 2000,
   animationId: 0,
-  soundEnabled: true,
+  vehicleSoundEnabled: false,
+  backgroundSoundEnabled: false,
+  uiSoundEnabled: false,
   supabaseReady: false,
   user: null,
   cloudSyncActive: false,
@@ -170,6 +173,8 @@ const audioState = {
   waterNoiseGain: null,
   waterFilter: null,
   waterStarted: false,
+  musicTimer: null,
+  musicThemeLevel: 0,
   primeNode: null,
 };
 
@@ -223,7 +228,7 @@ function updateFuelDisplay() {
 }
 
 function applyLevelTheme() {
-  const levelClass = state.level >= 4 ? "level-4" : `level-${state.level}`;
+  const levelClass = state.level >= 5 ? "level-5" : state.level >= 4 ? "level-4" : `level-${state.level}`;
   document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
   gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
   document.body.classList.add(levelClass);
@@ -313,6 +318,10 @@ function dismissWelcomeModal() {
   welcomeModal?.classList.add("hidden");
 }
 
+function anySoundEnabled() {
+  return state.vehicleSoundEnabled || state.backgroundSoundEnabled || state.uiSoundEnabled;
+}
+
 function triggerWelcomeStart() {
   if (welcomeModal?.classList.contains("hidden")) {
     return;
@@ -320,6 +329,7 @@ function triggerWelcomeStart() {
 
   state.entryReady = true;
   dismissWelcomeModal();
+  playUiWhooshSound();
   window.setTimeout(() => {
     showAuthGate();
   }, 120);
@@ -1501,6 +1511,7 @@ function showVehicleSetup() {
   updateGuestAccessUI();
   updateVehicleUnlockUI();
   toggleFeedbackPanel(false);
+  playUiWhooshSound();
   syncGameplayChrome();
   window.setTimeout(() => {
     const selectedVehicle = vehicleOptions.find((option) => option.dataset.vehicle === state.selectedVehicle && !option.disabled);
@@ -1524,12 +1535,14 @@ function showAuthGate() {
   updateAccessUI();
   updateGuestAccessUI();
   toggleFeedbackPanel(false);
+  playUiWhooshSound();
   syncGameplayChrome();
 }
 
 function showSignInForm() {
   showAuthGate();
   setAuthView("signin");
+  playUiWhooshSound();
   updateAuthStatus("Sign in to save your progress and keep racing with your account.", true);
 }
 
@@ -1545,6 +1558,7 @@ function showGuestRaceReady() {
   if (guestRaceReadyText) {
     guestRaceReadyText.textContent = `${state.racerName}, your ${prettifyVehicleName(state.selectedVehicle)} is ready. Tap Start Race when you want to begin.`;
   }
+  playUiWhooshSound();
   syncGameplayChrome();
 }
 
@@ -1698,6 +1712,7 @@ async function completePasswordReset() {
 function resetSessionForNewGame() {
   state.active = false;
   cancelAnimationFrame(state.animationId);
+  stopBackgroundMusic();
   clearBooster();
   state.score = 0;
   state.level = 1;
@@ -2249,6 +2264,44 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
 function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.clearRect(0, 0, width, height);
 
+  const drawScoreCardStreetLights = (roadLeft, roadWidth, tint = "rgba(255, 236, 176, 0.92)", poleTint = "rgba(215, 225, 235, 0.72)") => {
+    const leftX = roadLeft - 80;
+    const rightX = roadLeft + roadWidth + 80;
+    for (let y = 130; y < height; y += 170) {
+      ctx.strokeStyle = poleTint;
+      ctx.lineWidth = 6;
+
+      ctx.beginPath();
+      ctx.moveTo(leftX, y + 28);
+      ctx.lineTo(leftX, y + 120);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(leftX, y + 28);
+      ctx.lineTo(leftX + 34, y + 28);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(rightX, y + 28);
+      ctx.lineTo(rightX, y + 120);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rightX, y + 28);
+      ctx.lineTo(rightX - 34, y + 28);
+      ctx.stroke();
+
+      ctx.fillStyle = tint;
+      ctx.shadowColor = tint;
+      ctx.shadowBlur = 22;
+      ctx.beginPath();
+      ctx.arc(leftX + 34, y + 28, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(rightX - 34, y + 28, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  };
+
   if (levelNumber === 2) {
     const muddyGradient = ctx.createLinearGradient(0, 0, 0, height);
     muddyGradient.addColorStop(0, "#5b4333");
@@ -2269,6 +2322,7 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.strokeStyle = "rgba(237, 221, 199, 0.42)";
     ctx.lineWidth = 18;
     ctx.strokeRect(166, -2, 748, height + 4);
+    drawScoreCardStreetLights(160, 760, "rgba(255, 223, 163, 0.88)", "rgba(214, 191, 170, 0.68)");
     return;
   }
 
@@ -2304,19 +2358,27 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.beginPath();
     ctx.ellipse(860, height - 28, 280, 100, 0, 0, Math.PI * 2);
     ctx.fill();
+    drawScoreCardStreetLights(180, 720, "rgba(255, 241, 188, 0.9)", "rgba(214, 228, 240, 0.68)");
     return;
   }
 
   if (levelNumber >= 4) {
     const waterGradient = ctx.createLinearGradient(0, 0, 0, height);
-    waterGradient.addColorStop(0, "#2aa1d4");
-    waterGradient.addColorStop(0.2, "#1488c2");
-    waterGradient.addColorStop(0.58, "#0d679f");
-    waterGradient.addColorStop(1, "#09476f");
+    if (levelNumber >= 5) {
+      waterGradient.addColorStop(0, "#0a1930");
+      waterGradient.addColorStop(0.26, "#0c2848");
+      waterGradient.addColorStop(0.62, "#0a4168");
+      waterGradient.addColorStop(1, "#06253d");
+    } else {
+      waterGradient.addColorStop(0, "#2aa1d4");
+      waterGradient.addColorStop(0.2, "#1488c2");
+      waterGradient.addColorStop(0.58, "#0d679f");
+      waterGradient.addColorStop(1, "#09476f");
+    }
     ctx.fillStyle = waterGradient;
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.fillStyle = levelNumber >= 5 ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.12)";
     ctx.beginPath();
     ctx.ellipse(220, 140, 180, 44, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -2324,7 +2386,7 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.ellipse(780, 180, 240, 56, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.strokeStyle = levelNumber >= 5 ? "rgba(184, 223, 255, 0.16)" : "rgba(255, 255, 255, 0.16)";
     ctx.lineWidth = 8;
     for (let index = 0; index < 13; index += 1) {
       const y = 280 + index * 120;
@@ -2332,6 +2394,13 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
       ctx.moveTo(0, y);
       ctx.bezierCurveTo(220, y - 26, 480, y + 26, width, y - 8);
       ctx.stroke();
+    }
+
+    if (levelNumber >= 5) {
+      ctx.fillStyle = "rgba(255, 246, 201, 0.12)";
+      ctx.beginPath();
+      ctx.arc(860, 180, 110, 0, Math.PI * 2);
+      ctx.fill();
     }
     return;
   }
@@ -2361,6 +2430,7 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.lineTo(width / 2, height);
   ctx.stroke();
   ctx.setLineDash([]);
+  drawScoreCardStreetLights(160, 760);
 }
 
 function createScoreCardImage() {
@@ -2382,59 +2452,51 @@ function createScoreCardImage() {
 
   drawScoreCardBackground(ctx, scoreCardBackgroundLevel, canvas.width, canvas.height);
 
-  ctx.fillStyle = isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.54)";
+  ctx.fillStyle = isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.46)";
   ctx.fillRect(40, 40, 1000, 1840);
   ctx.strokeStyle = isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
   ctx.lineWidth = 8;
   ctx.strokeRect(40, 40, 1000, 1840);
 
-  ctx.fillStyle = isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(7, 17, 28, 0.58)";
+  const headerFill = isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
+  const panelFill = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
+  const waveStroke = isWaterCard ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.08)";
+
+  ctx.fillStyle = headerFill;
   ctx.fillRect(110, 90, 860, 200);
   ctx.strokeStyle = isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
   ctx.lineWidth = 5;
   ctx.strokeRect(110, 90, 860, 200);
 
-  if (isWaterCard) {
-    ctx.fillStyle = "rgba(10, 108, 163, 0.08)";
-    ctx.fillRect(120, 300, 840, 1320);
+  ctx.fillStyle = isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
+  ctx.fillRect(120, 300, 840, 1320);
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
-    ctx.lineWidth = 7;
-    for (let y = 340; y < 1660; y += 120) {
-      ctx.beginPath();
-      ctx.moveTo(110, y);
-      ctx.bezierCurveTo(280, y - 26, 460, y + 18, 650, y - 10);
-      ctx.bezierCurveTo(790, y - 26, 900, y + 12, 980, y - 8);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.09)";
+  ctx.strokeStyle = waveStroke;
+  ctx.lineWidth = 7;
+  for (let y = 340; y < 1660; y += 120) {
     ctx.beginPath();
-    ctx.ellipse(230, 310, 120, 24, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = "#232323";
-    ctx.fillRect(250, 270, 580, 1410);
-    ctx.fillStyle = "#d7d7d7";
-    ctx.fillRect(235, 270, 15, 1410);
-    ctx.fillRect(830, 270, 15, 1410);
-    ctx.fillStyle = "#ffe66d";
-    for (let y = 310; y < 1620; y += 180) {
-      ctx.fillRect(535, y, 10, 90);
-    }
+    ctx.moveTo(110, y);
+    ctx.bezierCurveTo(280, y - 26, 460, y + 18, 650, y - 10);
+    ctx.bezierCurveTo(790, y - 26, 900, y + 12, 980, y - 8);
+    ctx.stroke();
   }
+
+  ctx.fillStyle = isWaterCard ? "rgba(255, 255, 255, 0.09)" : "rgba(255, 255, 255, 0.05)";
+  ctx.beginPath();
+  ctx.ellipse(230, 310, 120, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");
   drawThreeDText(ctx, "High Score Card", 540, 236, "34px Verdana", "#cfd8dc", "rgba(3, 10, 18, 0.7)", "rgba(255, 255, 255, 0.08)");
 
-  ctx.fillStyle = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.72)";
+  ctx.fillStyle = panelFill;
   ctx.fillRect(160, 390, 760, 190);
   drawFittedCenteredThreeDText(ctx, state.racerName, 540, 485, 680, 108, 54, "#73efff", "rgba(2, 9, 18, 0.82)", "rgba(115, 239, 255, 0.18)");
 
-  ctx.fillStyle = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.72)";
+  ctx.fillStyle = panelFill;
   ctx.fillRect(160, 620, 760, 340);
   drawThreeDText(ctx, "Highest Score", 540, 735, "bold 60px Verdana", "#ffd166", "rgba(61, 31, 0, 0.75)", "rgba(255, 209, 102, 0.12)");
   drawThreeDText(ctx, String(scoreCardHighScore), 540, 875, "bold 210px Verdana", "#ffffff", "rgba(3, 10, 18, 0.82)", "rgba(255, 255, 255, 0.12)");
@@ -2475,8 +2537,13 @@ async function saveScoreCard() {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
-function updateSoundButton() {
-  soundButton.textContent = `Sound: ${state.soundEnabled ? "On" : "Off"}`;
+function updateSoundButtons() {
+  if (vehicleSoundButton) {
+    vehicleSoundButton.textContent = `Vehicle Sound: ${state.vehicleSoundEnabled ? "On" : "Off"}`;
+  }
+  if (backgroundSoundButton) {
+    backgroundSoundButton.textContent = `Background Sound: ${state.backgroundSoundEnabled && state.uiSoundEnabled ? "On" : "Off"}`;
+  }
 }
 
 function getAudioContext() {
@@ -2496,6 +2563,10 @@ function getAudioContext() {
 }
 
 async function ensureAudioReady() {
+  if (!anySoundEnabled()) {
+    return null;
+  }
+
   const context = getAudioContext();
   if (!context) {
     return null;
@@ -2537,6 +2608,189 @@ function createNoiseBuffer(context, durationSeconds = 2.5) {
   return buffer;
 }
 
+function midiToFrequency(noteNumber) {
+  return 440 * (2 ** ((noteNumber - 69) / 12));
+}
+
+function currentMusicLevel() {
+  return state.level >= 5 ? 5 : Math.max(1, state.level || 1);
+}
+
+function musicTheme(levelNumber = currentMusicLevel()) {
+  const themes = {
+    1: {
+      tempo: 88,
+      wave: "triangle",
+      volume: 0.052,
+      harmonyVolume: 0.032,
+      melodyStep: 0.5,
+      chordDuration: 1.7,
+      chords: [
+        [60, 64, 67],
+        [57, 60, 64],
+        [53, 57, 60],
+        [55, 59, 62],
+      ],
+      melody: [72, 74, 76, 74, 72, 71, 69, 67],
+    },
+    2: {
+      tempo: 94,
+      wave: "sine",
+      volume: 0.055,
+      harmonyVolume: 0.034,
+      melodyStep: 0.5,
+      chordDuration: 1.5,
+      chords: [
+        [62, 65, 69],
+        [60, 64, 67],
+        [57, 60, 64],
+        [59, 62, 65],
+      ],
+      melody: [74, 77, 76, 74, 72, 71, 69, 71],
+    },
+    3: {
+      tempo: 102,
+      wave: "triangle",
+      volume: 0.056,
+      harmonyVolume: 0.034,
+      melodyStep: 0.5,
+      chordDuration: 1.45,
+      chords: [
+        [64, 67, 71],
+        [60, 64, 67],
+        [62, 65, 69],
+        [59, 62, 67],
+      ],
+      melody: [79, 81, 83, 81, 79, 76, 74, 76],
+    },
+    4: {
+      tempo: 86,
+      wave: "sine",
+      volume: 0.053,
+      harmonyVolume: 0.032,
+      melodyStep: 0.5,
+      chordDuration: 1.85,
+      chords: [
+        [57, 60, 64],
+        [55, 59, 62],
+        [53, 57, 60],
+        [52, 55, 59],
+      ],
+      melody: [69, 72, 74, 72, 69, 67, 65, 64],
+    },
+    5: {
+      tempo: 96,
+      wave: "triangle",
+      volume: 0.055,
+      harmonyVolume: 0.034,
+      melodyStep: 0.5,
+      chordDuration: 1.6,
+      chords: [
+        [59, 62, 66],
+        [60, 64, 67],
+        [57, 60, 64],
+        [62, 66, 69],
+      ],
+      melody: [74, 78, 81, 78, 76, 74, 71, 69],
+    },
+  };
+
+  return themes[levelNumber] || themes[1];
+}
+
+function playMusicNote(context, frequency, startTime, duration, volume, wave = "triangle") {
+  if (!audioState.masterGain) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  const filter = context.createBiquadFilter();
+
+  oscillator.type = wave;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(1400, startTime);
+
+  gainNode.gain.setValueAtTime(0.0001, startTime);
+  gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.08);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.02);
+}
+
+function scheduleMusicBar(theme, startTime) {
+  const beatSeconds = 60 / theme.tempo;
+  const chordDurationSeconds = beatSeconds * theme.chordDuration;
+  const melodyDurationSeconds = beatSeconds * 0.42;
+
+  theme.chords.forEach((chord, chordIndex) => {
+    const chordStart = startTime + chordIndex * beatSeconds;
+    chord.forEach((noteNumber, noteIndex) => {
+      const detuneFrequency = midiToFrequency(noteNumber + (noteIndex === 0 ? -12 : 0));
+      const noteVolume = noteIndex === 0 ? theme.harmonyVolume * 0.9 : theme.harmonyVolume;
+      playMusicNote(audioState.context, detuneFrequency, chordStart, chordDurationSeconds, noteVolume, theme.wave);
+    });
+  });
+
+  theme.melody.forEach((noteNumber, melodyIndex) => {
+    const noteStart = startTime + melodyIndex * beatSeconds * theme.melodyStep;
+    playMusicNote(audioState.context, midiToFrequency(noteNumber), noteStart, melodyDurationSeconds, theme.volume, theme.wave);
+  });
+}
+
+function stopBackgroundMusic() {
+  if (audioState.musicTimer) {
+    window.clearInterval(audioState.musicTimer);
+    audioState.musicTimer = null;
+  }
+  audioState.musicThemeLevel = 0;
+}
+
+function scheduleBackgroundMusic(forceRestart = false) {
+  if (!audioState.context || !state.backgroundSoundEnabled) {
+    return;
+  }
+
+  const levelNumber = currentMusicLevel();
+  if (!forceRestart && audioState.musicTimer && audioState.musicThemeLevel === levelNumber) {
+    return;
+  }
+
+  stopBackgroundMusic();
+
+  const theme = musicTheme(levelNumber);
+  const beatSeconds = 60 / theme.tempo;
+  const barSeconds = beatSeconds * theme.chords.length;
+  const scheduleBar = () => {
+    if (!state.backgroundSoundEnabled) {
+      return;
+    }
+    scheduleMusicBar(theme, audioState.context.currentTime + 0.04);
+  };
+
+  audioState.musicThemeLevel = levelNumber;
+  scheduleBar();
+  audioState.musicTimer = window.setInterval(scheduleBar, Math.max(1000, barSeconds * 1000));
+}
+
+async function startBackgroundMusic(forceRestart = false) {
+  if (!state.backgroundSoundEnabled) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context) {
+    return;
+  }
+
+  scheduleBackgroundMusic(forceRestart);
+}
+
 function engineSoundProfile(vehicleName) {
   const profiles = {
     "bike-street": { wave: "sawtooth", baseFrequency: 126, steerBoost: 12, activeGain: 0.065, speedFactor: 10.5 },
@@ -2556,7 +2810,7 @@ function engineSoundProfile(vehicleName) {
 }
 
 async function startEngineSound() {
-  if (!state.soundEnabled) {
+  if (!state.vehicleSoundEnabled) {
     return;
   }
 
@@ -2596,7 +2850,7 @@ function stopEngineSound() {
 }
 
 function updateEngineSound() {
-  if (!audioState.engineStarted || !state.soundEnabled) {
+  if (!audioState.engineStarted || !state.vehicleSoundEnabled) {
     return;
   }
 
@@ -2617,7 +2871,7 @@ function updateEngineSound() {
 }
 
 async function startWaterSound() {
-  if (!state.soundEnabled || state.level < 4) {
+  if (!state.backgroundSoundEnabled || state.level < 4) {
     return;
   }
 
@@ -2660,12 +2914,12 @@ function stopWaterSound() {
 }
 
 function updateWaterSound() {
-  if (!audioState.waterStarted || !state.soundEnabled || !audioState.context || !audioState.waterNoiseGain || !audioState.waterFilter) {
+  if (!audioState.waterStarted || !state.backgroundSoundEnabled || !audioState.context || !audioState.waterNoiseGain || !audioState.waterFilter) {
     return;
   }
 
   const now = audioState.context.currentTime;
-  const targetGain = state.active && state.level === 4 ? 0.03 : 0.0001;
+  const targetGain = state.active && state.level >= 4 ? 0.074 : 0.0001;
   const targetFrequency = 340 + state.currentSpeed * 18;
 
   audioState.waterFilter.frequency.cancelScheduledValues(now);
@@ -2675,7 +2929,15 @@ function updateWaterSound() {
 }
 
 async function playToneSweep(options) {
-  if (!state.soundEnabled) {
+  if (options.category === "ui") {
+    if (!state.uiSoundEnabled) {
+      return;
+    }
+  } else if (options.category === "background") {
+    if (!state.backgroundSoundEnabled) {
+      return;
+    }
+  } else if (!state.vehicleSoundEnabled) {
     return;
   }
 
@@ -2699,6 +2961,7 @@ async function playToneSweep(options) {
 
 function playBoosterSound() {
   playToneSweep({
+    category: "vehicle",
     type: "triangle",
     startFrequency: 320,
     endFrequency: 980,
@@ -2709,12 +2972,97 @@ function playBoosterSound() {
 
 function playCrashSound() {
   playToneSweep({
+    category: "vehicle",
     type: "sawtooth",
     startFrequency: 210,
     endFrequency: 58,
     duration: 0.45,
     volume: 0.16,
   });
+}
+
+function playGameOverSound() {
+  const notes = [
+    { start: 720, end: 660, delay: 0 },
+    { start: 620, end: 560, delay: 170 },
+    { start: 520, end: 460, delay: 340 },
+    { start: 420, end: 340, delay: 520 },
+  ];
+
+  notes.forEach((note) => {
+    window.setTimeout(() => {
+      playToneSweep({
+        category: "background",
+        type: "triangle",
+        startFrequency: note.start,
+        endFrequency: note.end,
+        duration: 0.22,
+        volume: 0.12,
+      });
+    }, note.delay);
+  });
+}
+
+function playUiTapSound() {
+  playToneSweep({
+    category: "ui",
+    type: "triangle",
+    startFrequency: 520,
+    endFrequency: 660,
+    duration: 0.08,
+    volume: 0.24,
+  });
+}
+
+function playCountdownBell(count) {
+  const startFrequencyByCount = {
+    3: 1180,
+    2: 1320,
+    1: 1480,
+  };
+
+  const startFrequency = startFrequencyByCount[count] || 1320;
+  playToneSweep({
+    category: "ui",
+    type: "sine",
+    startFrequency,
+    endFrequency: startFrequency * 1.08,
+    duration: 0.16,
+    volume: 0.24,
+  });
+}
+
+function playUiWhooshSound() {
+  playToneSweep({
+    category: "ui",
+    type: "sine",
+    startFrequency: 260,
+    endFrequency: 520,
+    duration: 0.16,
+    volume: 0.05,
+  });
+}
+
+function playLevelUpSound() {
+  playToneSweep({
+    category: "ui",
+    type: "triangle",
+    startFrequency: 420,
+    endFrequency: 940,
+    duration: 0.22,
+    volume: 0.07,
+  });
+
+  window.setTimeout(() => {
+    playToneSweep({
+      category: "ui",
+      type: "triangle",
+      startFrequency: 640,
+      endFrequency: 1180,
+      duration: 0.2,
+      volume: 0.06,
+    });
+  }, 110);
 }
 
 function vehicleWidth() {
@@ -3164,6 +3512,7 @@ async function showCountdownOverlay(title, subtitle = "") {
     `;
     message.classList.remove("hidden");
     syncVehiclePreviewVisibility();
+    playCountdownBell(count);
     await new Promise((resolve) => window.setTimeout(resolve, 800));
   }
 
@@ -3220,6 +3569,7 @@ async function beginLevel(levelNumber) {
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
+  stopBackgroundMusic();
   syncGameplayChrome();
 
   const title = levelNumber === 1 ? "Level 1 Starts" : `Entering Level ${levelNumber}`;
@@ -3234,6 +3584,7 @@ async function beginLevel(levelNumber) {
           : "Level 5 begins. Keep the water run alive.";
 
   await showCountdownOverlay(title, subtitle);
+  playLevelUpSound();
 
   state.level = levelNumber;
   state.levelStartScore = state.score;
@@ -3297,6 +3648,7 @@ async function beginLevel(levelNumber) {
   if (levelNumber >= 4) {
     await startWaterSound();
   }
+  await startBackgroundMusic(true);
   updateWaterSound();
   state.active = true;
   state.pendingTransition = false;
@@ -3449,6 +3801,7 @@ async function handleVehicleCrash() {
     syncGameplayChrome();
     cancelAnimationFrame(state.animationId);
     stopEngineSound();
+    stopBackgroundMusic();
     state.playerX = middleLaneX();
     playerCar.style.left = `${state.playerX}px`;
     resetEnemies();
@@ -3485,6 +3838,7 @@ async function handleVehicleCrash() {
     if (state.level >= 4) {
       await startWaterSound();
     }
+    await startBackgroundMusic(true);
     updateWaterSound();
     state.active = true;
     state.pendingTransition = false;
@@ -3748,6 +4102,7 @@ function endGame(title = "Crash!") {
   stopEngineSound();
   stopWaterSound();
   playCrashSound();
+  playGameOverSound();
   state.restartLevel = state.level;
   state.restartVehicle = state.selectedVehicle;
   maybeUpdateBestScore();
@@ -3803,11 +4158,12 @@ async function resumeGame() {
   state.paused = false;
   state.lastFrameTime = performance.now();
   await primeMobileAudio();
-  if (state.soundEnabled) {
+  if (state.vehicleSoundEnabled || state.backgroundSoundEnabled) {
     await startEngineSound();
     if (state.level >= 4) {
       await startWaterSound();
     }
+    await startBackgroundMusic(true);
     updateEngineSound();
     updateWaterSound();
   }
@@ -3828,6 +4184,7 @@ function pauseGame() {
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
   stopWaterSound();
+  stopBackgroundMusic();
   message.classList.remove("choice-mode", "guest-race-mode", "game-over");
   message.classList.add("paused-mode");
   message.innerHTML = `
@@ -3860,7 +4217,7 @@ state.adminUnlocked = hasAdminAccess();
 syncGameBounds();
 refreshSpeed();
 syncVehiclePreviewVisibility();
-updateSoundButton();
+updateSoundButtons();
 updateBestScoreDisplay();
 updateLevelDisplay();
 updateLivesDisplay();
@@ -3898,21 +4255,35 @@ gameArea.addEventListener("touchmove", (event) => {
   }
 }, { passive: true });
 
-soundButton.addEventListener("click", async () => {
+vehicleSoundButton?.addEventListener("click", async () => {
   await primeMobileAudio();
-  state.soundEnabled = !state.soundEnabled;
-  updateSoundButton();
+  state.vehicleSoundEnabled = !state.vehicleSoundEnabled;
+  updateSoundButtons();
 
-  if (state.soundEnabled) {
+  if (state.vehicleSoundEnabled) {
     await startEngineSound();
+    updateEngineSound();
+  } else {
+    stopEngineSound();
+  }
+});
+
+backgroundSoundButton?.addEventListener("click", async () => {
+  await primeMobileAudio();
+  const nextEnabled = !(state.backgroundSoundEnabled && state.uiSoundEnabled);
+  state.backgroundSoundEnabled = nextEnabled;
+  state.uiSoundEnabled = nextEnabled;
+  updateSoundButtons();
+
+  if (nextEnabled) {
     if (state.level >= 4) {
       await startWaterSound();
     }
-    updateEngineSound();
+    await startBackgroundMusic(true);
     updateWaterSound();
   } else {
-    stopEngineSound();
     stopWaterSound();
+    stopBackgroundMusic();
   }
 });
 
@@ -3963,15 +4334,25 @@ touchHoldButtons.forEach((button) => {
   window.addEventListener(eventName, () => {
     primeMobileAudio();
 
-    if (state.soundEnabled && state.active) {
+    if ((state.vehicleSoundEnabled || state.backgroundSoundEnabled) && state.active) {
       startEngineSound();
       if (state.level >= 4) {
         startWaterSound();
       }
+      startBackgroundMusic();
       updateEngineSound();
       updateWaterSound();
     }
   }, { passive: true });
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) {
+    return;
+  }
+
+  playUiTapSound();
 });
 
 window.addEventListener("resize", () => {
