@@ -126,6 +126,8 @@ const levelFourTargetKmph = 85;
 const levelFiveWarmupDurationMs = 10000;
 const levelFiveWarmupKmph = 65;
 const levelFiveTargetKmph = 90;
+const finalLevelWarmupKmph = 60;
+const finalLevelTargetKmph = 90;
 const boostDurationMs = 5000;
 const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
@@ -217,6 +219,9 @@ const audioState = {
   engineGain: null,
   engineOscillator: null,
   engineLowpass: null,
+  engineSecondaryGain: null,
+  engineSecondaryOscillator: null,
+  engineSecondaryFilter: null,
   engineStarted: false,
   waterNoiseSource: null,
   waterNoiseGain: null,
@@ -257,6 +262,12 @@ function getLivesAwardForLevel(levelNumber = state.level) {
   if (levelNumber === 4) {
     return 2;
   }
+  if (levelNumber === 6) {
+    return 3;
+  }
+  if (levelNumber >= 7) {
+    return 2;
+  }
   return 0;
 }
 
@@ -283,12 +294,12 @@ function updateFuelDisplay() {
 }
 
 function applyLevelTheme() {
-  const levelClass = state.level >= 6 ? "level-6" : state.level >= 5 ? "level-5" : state.level >= 4 ? "level-4" : `level-${state.level}`;
-  document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6");
-  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6");
+  const levelClass = state.level >= 7 ? "level-7" : state.level >= 6 ? "level-6" : state.level >= 5 ? "level-5" : state.level >= 4 ? "level-4" : `level-${state.level}`;
+  document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6", "level-7");
+  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6", "level-7");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
-  if (isSkyLevel()) {
+  if (state.level === 6) {
     ensureSkyClouds(true);
   } else {
     clearSkyClouds();
@@ -418,7 +429,14 @@ function updatePlayerInvincibility() {
 function getCurrentKmph() {
   const metersPerPixel = visibleRoadLengthMeters / gameBounds.height;
   const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
-  return Math.round(metersPerSecond * 3.6);
+  const realKmph = Math.round(metersPerSecond * 3.6);
+  if (state.level === 6) {
+    return realKmph * 10;
+  }
+  if (state.level >= 7) {
+    return realKmph * 1000;
+  }
+  return realKmph;
 }
 
 function gameSpeedForKmph(targetKmph) {
@@ -457,6 +475,12 @@ function levelWarmupKmph(levelNumber) {
   if (levelNumber === 4) {
     return levelFourWarmupKmph;
   }
+  if (levelNumber === 6) {
+    return levelFiveWarmupKmph;
+  }
+  if (levelNumber >= 7) {
+    return finalLevelWarmupKmph;
+  }
   if (levelNumber >= 5) {
     return levelFiveWarmupKmph;
   }
@@ -475,6 +499,12 @@ function levelMaxKmph(levelNumber) {
   }
   if (levelNumber === 4) {
     return levelFourTargetKmph;
+  }
+  if (levelNumber === 6) {
+    return levelFiveTargetKmph;
+  }
+  if (levelNumber >= 7) {
+    return finalLevelTargetKmph;
   }
   if (levelNumber >= 5) {
     return levelFiveTargetKmph;
@@ -3007,7 +3037,7 @@ function midiToFrequency(noteNumber) {
 }
 
 function currentMusicLevel() {
-  return state.level >= 6 ? 6 : state.level >= 5 ? 5 : Math.max(1, state.level || 1);
+  return state.level >= 7 ? 7 : state.level >= 6 ? 6 : state.level >= 5 ? 5 : Math.max(1, state.level || 1);
 }
 
 function musicTheme(levelNumber = currentMusicLevel()) {
@@ -3086,6 +3116,36 @@ function musicTheme(levelNumber = currentMusicLevel()) {
         [62, 66, 69],
       ],
       melody: [74, 78, 81, 78, 76, 74, 71, 69],
+    },
+    6: {
+      tempo: 82,
+      wave: "sine",
+      volume: 0.52,
+      harmonyVolume: 0.3,
+      melodyStep: 0.5,
+      chordDuration: 1.9,
+      chords: [
+        [57, 61, 64],
+        [59, 62, 66],
+        [60, 64, 67],
+        [62, 66, 69],
+      ],
+      melody: [72, 74, 76, 79, 76, 74, 72, 69],
+    },
+    7: {
+      tempo: 74,
+      wave: "triangle",
+      volume: 0.5,
+      harmonyVolume: 0.28,
+      melodyStep: 0.5,
+      chordDuration: 2.2,
+      chords: [
+        [52, 59, 64],
+        [50, 57, 62],
+        [47, 54, 59],
+        [45, 52, 57],
+      ],
+      melody: [81, 84, 88, 86, 84, 81, 79, 76],
     },
   };
 
@@ -3299,6 +3359,71 @@ function engineSoundProfile(vehicleName) {
     "jet-silver": { wave: "sawtooth", baseFrequency: 54, steerBoost: 3, activeGain: 0.28, speedFactor: 4.1, lowpass: 520 },
     "jet-gold": { wave: "square", baseFrequency: 48, steerBoost: 2, activeGain: 0.3, speedFactor: 3.7, lowpass: 420 },
     "jet-stealth": { wave: "triangle", baseFrequency: 60, steerBoost: 2, activeGain: 0.27, speedFactor: 4.5, lowpass: 680 },
+    "plane-private": {
+      wave: "sawtooth",
+      baseFrequency: 88,
+      steerBoost: 1,
+      activeGain: 0.31,
+      speedFactor: 3.8,
+      lowpass: 980,
+      secondaryWave: "triangle",
+      secondaryBaseFrequency: 156,
+      secondarySpeedFactor: 5.4,
+      secondaryGain: 0.16,
+      secondaryFilter: 1650,
+    },
+    "plane-golden": {
+      wave: "sawtooth",
+      baseFrequency: 82,
+      steerBoost: 1,
+      activeGain: 0.32,
+      speedFactor: 3.5,
+      lowpass: 900,
+      secondaryWave: "square",
+      secondaryBaseFrequency: 148,
+      secondarySpeedFactor: 5.1,
+      secondaryGain: 0.18,
+      secondaryFilter: 1500,
+    },
+    "plane-stealth": {
+      wave: "triangle",
+      baseFrequency: 96,
+      steerBoost: 1,
+      activeGain: 0.29,
+      speedFactor: 4.2,
+      lowpass: 1200,
+      secondaryWave: "sawtooth",
+      secondaryBaseFrequency: 170,
+      secondarySpeedFactor: 5.8,
+      secondaryGain: 0.14,
+      secondaryFilter: 1800,
+    },
+    "ufo-metal": {
+      wave: "sine",
+      baseFrequency: 118,
+      steerBoost: 0,
+      activeGain: 0.28,
+      speedFactor: 2.6,
+      lowpass: 1400,
+      secondaryWave: "triangle",
+      secondaryBaseFrequency: 236,
+      secondarySpeedFactor: 3.4,
+      secondaryGain: 0.2,
+      secondaryFilter: 2100,
+    },
+    "ufo-mercury": {
+      wave: "triangle",
+      baseFrequency: 132,
+      steerBoost: 0,
+      activeGain: 0.29,
+      speedFactor: 2.8,
+      lowpass: 1500,
+      secondaryWave: "sine",
+      secondaryBaseFrequency: 264,
+      secondarySpeedFactor: 3.8,
+      secondaryGain: 0.22,
+      secondaryFilter: 2300,
+    },
   };
 
   return profiles[vehicleName] || profiles["car-sport"];
@@ -3318,19 +3443,35 @@ async function startEngineSound() {
   const oscillator = context.createOscillator();
   const gainNode = context.createGain();
   const lowpass = context.createBiquadFilter();
+  const secondaryOscillator = context.createOscillator();
+  const secondaryGain = context.createGain();
+  const secondaryFilter = context.createBiquadFilter();
   lowpass.type = "lowpass";
   lowpass.frequency.value = profile.lowpass || 1600;
   oscillator.type = profile.wave;
   oscillator.frequency.value = profile.baseFrequency;
   gainNode.gain.value = 0.0001;
+  secondaryFilter.type = "bandpass";
+  secondaryFilter.frequency.value = profile.secondaryFilter || 1200;
+  secondaryFilter.Q.value = 0.35;
+  secondaryOscillator.type = profile.secondaryWave || "triangle";
+  secondaryOscillator.frequency.value = profile.secondaryBaseFrequency || profile.baseFrequency * 1.9;
+  secondaryGain.gain.value = 0.0001;
   oscillator.connect(lowpass);
   lowpass.connect(gainNode);
   gainNode.connect(audioState.masterGain);
+  secondaryOscillator.connect(secondaryFilter);
+  secondaryFilter.connect(secondaryGain);
+  secondaryGain.connect(audioState.masterGain);
   oscillator.start();
+  secondaryOscillator.start();
 
   audioState.engineOscillator = oscillator;
   audioState.engineGain = gainNode;
   audioState.engineLowpass = lowpass;
+  audioState.engineSecondaryOscillator = secondaryOscillator;
+  audioState.engineSecondaryGain = secondaryGain;
+  audioState.engineSecondaryFilter = secondaryFilter;
   audioState.engineStarted = true;
 }
 
@@ -3342,6 +3483,10 @@ function stopEngineSound() {
   const now = audioState.context.currentTime;
   audioState.engineGain.gain.cancelScheduledValues(now);
   audioState.engineGain.gain.setTargetAtTime(0.0001, now, 0.08);
+  if (audioState.engineSecondaryGain) {
+    audioState.engineSecondaryGain.gain.cancelScheduledValues(now);
+    audioState.engineSecondaryGain.gain.setTargetAtTime(0.0001, now, 0.08);
+  }
 }
 
 function updateEngineSound() {
@@ -3354,15 +3499,32 @@ function updateEngineSound() {
   const steerBoost = state.keys.ArrowLeft || state.keys.ArrowRight ? profile.steerBoost : 0;
   const targetFrequency = profile.baseFrequency + state.currentSpeed * profile.speedFactor + steerBoost;
   const targetGain = state.active ? profile.activeGain : 0.0001;
+  const isPlane = state.selectedVehicle.startsWith("plane-");
+  const isUfo = state.selectedVehicle.startsWith("ufo-");
+  const modulation = isPlane ? Math.sin(Date.now() / 120) * 8 : isUfo ? Math.sin(Date.now() / 90) * 18 : 0;
+  const primaryFrequency = targetFrequency + modulation * (isUfo ? 0.6 : 0);
+  const secondaryFrequency = (profile.secondaryBaseFrequency || profile.baseFrequency * 1.9) + state.currentSpeed * (profile.secondarySpeedFactor || 4.8) + modulation;
+  const secondaryGainTarget = state.active && (isPlane || isUfo) ? (profile.secondaryGain || 0.14) : 0.0001;
 
   audioState.engineOscillator.frequency.cancelScheduledValues(now);
-  audioState.engineOscillator.frequency.linearRampToValueAtTime(targetFrequency, now + 0.08);
+  audioState.engineOscillator.frequency.linearRampToValueAtTime(primaryFrequency, now + 0.08);
   if (audioState.engineLowpass) {
     audioState.engineLowpass.frequency.cancelScheduledValues(now);
     audioState.engineLowpass.frequency.linearRampToValueAtTime(profile.lowpass || 1600, now + 0.08);
   }
   audioState.engineGain.gain.cancelScheduledValues(now);
   audioState.engineGain.gain.setTargetAtTime(targetGain, now, 0.08);
+  if (audioState.engineSecondaryOscillator && audioState.engineSecondaryGain) {
+    audioState.engineSecondaryOscillator.type = profile.secondaryWave || "triangle";
+    audioState.engineSecondaryOscillator.frequency.cancelScheduledValues(now);
+    audioState.engineSecondaryOscillator.frequency.linearRampToValueAtTime(secondaryFrequency, now + 0.08);
+    if (audioState.engineSecondaryFilter) {
+      audioState.engineSecondaryFilter.frequency.cancelScheduledValues(now);
+      audioState.engineSecondaryFilter.frequency.linearRampToValueAtTime(profile.secondaryFilter || 1200, now + 0.08);
+    }
+    audioState.engineSecondaryGain.gain.cancelScheduledValues(now);
+    audioState.engineSecondaryGain.gain.setTargetAtTime(secondaryGainTarget, now, 0.08);
+  }
 }
 
 async function startWaterSound() {
@@ -3560,14 +3722,77 @@ function playUiWhooshSound() {
   });
 }
 
-function playLevelUpSound() {
+function playMissileHitSound() {
+  playToneSweep({
+    category: "background",
+    type: "square",
+    startFrequency: 980,
+    endFrequency: 210,
+    duration: 0.16,
+    volume: 0.62,
+  });
+
+  window.setTimeout(() => {
+    playToneSweep({
+      category: "background",
+      type: "triangle",
+      startFrequency: 420,
+      endFrequency: 120,
+      duration: 0.14,
+      volume: 0.38,
+    });
+  }, 45);
+}
+
+function playFinalLevelVoice() {
+  if (!state.backgroundSoundEnabled || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance("You have reached Final Level");
+    utterance.rate = 0.98;
+    utterance.pitch = 1.08;
+    utterance.volume = 1;
+
+    const availableVoices = window.speechSynthesis.getVoices();
+    const preferredVoice = availableVoices.find((voice) => /en/i.test(voice.lang) && /female|zira|samantha|google/i.test(voice.name))
+      || availableVoices.find((voice) => /en/i.test(voice.lang))
+      || null;
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve();
+    };
+
+    utterance.onend = finish;
+    utterance.onerror = finish;
+
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      window.setTimeout(finish, 2600);
+    } catch (error) {
+      finish();
+    }
+  });
+}
+
+async function playLevelUpSound(levelNumber = state.level) {
   const notes = [
-    { start: 520, end: 620, delay: 0, duration: 0.14, volume: 0.68 },
-    { start: 620, end: 760, delay: 120, duration: 0.14, volume: 0.72 },
-    { start: 760, end: 920, delay: 240, duration: 0.16, volume: 0.76 },
-    { start: 980, end: 1120, delay: 430, duration: 0.18, volume: 0.82 },
-    { start: 1120, end: 1280, delay: 610, duration: 0.16, volume: 0.78 },
-    { start: 1280, end: 1460, delay: 770, duration: 0.18, volume: 0.84 },
+    { start: 460, end: 560, delay: 0, duration: 0.14, volume: 0.72 },
+    { start: 560, end: 700, delay: 120, duration: 0.15, volume: 0.76 },
+    { start: 700, end: 880, delay: 250, duration: 0.16, volume: 0.8 },
+    { start: 880, end: 1060, delay: 420, duration: 0.19, volume: 0.86 },
+    { start: 980, end: 1240, delay: 610, duration: 0.18, volume: 0.84 },
+    { start: 1120, end: 1420, delay: 770, duration: 0.2, volume: 0.9 },
   ];
 
   notes.forEach((note) => {
@@ -3582,6 +3807,12 @@ function playLevelUpSound() {
       });
     }, note.delay);
   });
+
+  await new Promise((resolve) => window.setTimeout(resolve, 1060));
+
+  if (levelNumber >= 7) {
+    await playFinalLevelVoice();
+  }
 }
 
 function vehicleWidth() {
@@ -3783,7 +4014,11 @@ function applyVehicleSelection(vehicleName) {
   }
 
   if (audioState.engineStarted) {
-    audioState.engineOscillator.type = engineSoundProfile(state.selectedVehicle).wave;
+    const profile = engineSoundProfile(state.selectedVehicle);
+    audioState.engineOscillator.type = profile.wave;
+    if (audioState.engineSecondaryOscillator) {
+      audioState.engineSecondaryOscillator.type = profile.secondaryWave || "triangle";
+    }
     updateEngineSound();
   }
 }
@@ -4141,6 +4376,7 @@ function updateMissiles(deltaFrames = 1) {
       const verticalHit = missileSweepBottom >= enemyTop && missileSweepTop <= enemyTop + enemyHeight;
 
       if (horizontalHit && verticalHit) {
+        playMissileHitSound();
         showScoreBonusPopup(
           enemyLeft + Math.max(0, enemyWidth / 2 - 34),
           enemyTop + Math.max(10, enemyHeight * 0.2),
@@ -4223,35 +4459,26 @@ async function showCountdownOverlay(title, subtitle = "") {
   syncGameplayChrome();
 }
 
+function displayLevelName(levelNumber) {
+  return levelNumber >= 7 ? "Final Level" : `Level ${levelNumber}`;
+}
+
 function showLevelFourSelection(targetLevel = 4) {
   state.levelFourSelectionOpen = true;
   const planeUnlocked = targetLevel >= 6 || isLevelSixVehicleUnlocked();
   const ufoUnlocked = targetLevel >= 7 || isLevelSevenVehicleUnlocked();
   const showUfoOnly = targetLevel >= 7;
   const showPlaneOnly = targetLevel >= 6;
-  const headingLevel = targetLevel >= 4 ? targetLevel : 4;
+  const headingLabel = targetLevel >= 4 ? displayLevelName(targetLevel) : "Level 4";
   message.innerHTML = `
     <div class="level-four-panel">
       <p class="countdown-eyebrow">Congratulations</p>
-      <h2>Welcome To Level ${headingLevel}</h2>
+      <h2>Welcome To ${headingLabel}</h2>
       <p>${showUfoOnly ? "Final Level is unlocked. Choose your UFO to begin the next race." : showPlaneOnly ? "Aeroplane access is unlocked. Choose your aircraft to begin the next race." : "You are entering open water. Choose your ride to begin the next race."}</p>
       <div class="vehicle-group level-four-group">
-        <h3>${showUfoOnly ? "Choose Your UFO" : showPlaneOnly ? "Choose Your Aeroplane" : "Choose Your Boat Or Aeroplane"}</h3>
+        ${showUfoOnly || showPlaneOnly ? `
+        <h3>${showUfoOnly ? "Choose Your UFO" : "Choose Your Aeroplane"}</h3>
         <div class="vehicle-grid jet-grid">
-          ${showPlaneOnly || showUfoOnly ? "" : `
-          <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
-            <span class="vehicle-preview jet-preview jet-silver"></span>
-            <span>Small Boat</span>
-          </button>
-          <button class="vehicle-option jet-select-option" data-jet="jet-gold" type="button">
-            <span class="vehicle-preview jet-preview jet-gold"></span>
-            <span>Ship</span>
-          </button>
-          <button class="vehicle-option jet-select-option" data-jet="jet-stealth" type="button">
-            <span class="vehicle-preview jet-preview jet-stealth"></span>
-            <span>Yacht</span>
-          </button>
-          `}
           ${showUfoOnly ? "" : `
           <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-private" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
             <span class="vehicle-preview plane-preview plane-private"></span>
@@ -4277,6 +4504,46 @@ function showLevelFourSelection(targetLevel = 4) {
           </button>
           ` : ""}
         </div>
+        ` : `
+        <div class="selection-choice-columns">
+          <div class="selection-choice-column">
+            <h3>Choose Your Boat</h3>
+            <div class="selection-section-note">Boats Available Now</div>
+            <div class="vehicle-grid jet-grid section-grid">
+              <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
+                <span class="vehicle-preview jet-preview jet-silver"></span>
+                <span>Small Boat</span>
+              </button>
+              <button class="vehicle-option jet-select-option" data-jet="jet-gold" type="button">
+                <span class="vehicle-preview jet-preview jet-gold"></span>
+                <span>Ship</span>
+              </button>
+              <button class="vehicle-option jet-select-option" data-jet="jet-stealth" type="button">
+                <span class="vehicle-preview jet-preview jet-stealth"></span>
+                <span>Yacht</span>
+              </button>
+            </div>
+          </div>
+          <div class="selection-choice-column">
+            <h3>Choose Your Aeroplane</h3>
+            <div class="selection-section-note is-locked">Unlocks At Level 6</div>
+            <div class="vehicle-grid jet-grid section-grid">
+              <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-private" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+                <span class="vehicle-preview plane-preview plane-private"></span>
+                <span>Private Jet</span>
+              </button>
+              <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-golden" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+                <span class="vehicle-preview plane-preview plane-golden"></span>
+                <span>Golden Plane</span>
+              </button>
+              <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-stealth" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+                <span class="vehicle-preview plane-preview plane-stealth"></span>
+                <span>Sky Plane</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        `}
       </div>
     </div>
   `;
@@ -4294,7 +4561,7 @@ function showLevelFourSelection(targetLevel = 4) {
   });
 }
 
-async function beginLevel(levelNumber) {
+async function beginLevel(levelNumber, skipCelebration = false) {
   state.pendingTransition = true;
   state.active = false;
   state.paused = false;
@@ -4305,7 +4572,7 @@ async function beginLevel(levelNumber) {
   stopBackgroundMusic();
   syncGameplayChrome();
 
-  const title = levelNumber === 1 ? "Level 1 Starts" : `Entering Level ${levelNumber}`;
+  const title = levelNumber === 1 ? "Level 1 Starts" : `Entering ${displayLevelName(levelNumber)}`;
   const subtitle = levelNumber === 1
     ? "Get ready to build speed."
     : levelNumber === 2
@@ -4318,9 +4585,11 @@ async function beginLevel(levelNumber) {
             ? "Level 5 begins. Keep the water run alive."
             : levelNumber === 6
               ? "Level 6 unlocked. Aeroplane access is now live."
-              : "Level 7 test flight. Push the late-game run.";
+              : "Final Level unlocked. UFO access is now live.";
 
-  playLevelUpSound();
+  if (!skipCelebration) {
+    await playLevelUpSound(levelNumber);
+  }
   await showCountdownOverlay(title, subtitle);
 
   state.level = levelNumber;
@@ -4820,9 +5089,10 @@ async function gameLoop(frameTime = performance.now()) {
     stopEngineSound();
     stopWaterSound();
     clearBooster();
+    await playLevelUpSound(7);
     const selectedUfo = await showLevelFourSelection(7);
     applyVehicleSelection(selectedUfo || "ufo-metal");
-    await beginLevel(7);
+    await beginLevel(7, true);
     return;
   }
 
