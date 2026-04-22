@@ -1179,6 +1179,17 @@ body.is-playing .game-area {
   justify-items: center;
 }
 
+.vehicle-setup .profile-panel .auth-actions.compact {
+  width: min(100%, 190px);
+  grid-template-columns: 1fr;
+  justify-self: center;
+}
+
+.vehicle-setup .profile-panel .auth-actions.compact .auth-button {
+  width: 100%;
+  min-height: 46px;
+}
+
 .vehicle-setup.selection-mode .guest-donation-panel,
 .vehicle-setup.selection-mode .account-secondary-actions,
 .vehicle-setup.selection-mode .feedback-panel,
