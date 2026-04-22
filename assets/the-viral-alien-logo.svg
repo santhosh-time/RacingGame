@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 260" role="img" aria-labelledby="title desc">
+  <title id="title">The Viral Alien logo</title>
+  <desc id="desc">A playful logo reading The Viral Alien with a smiling alien mascot and orbit ring.</desc>
+  <defs>
+    <linearGradient id="panel" x1="32" y1="34" x2="256" y2="234" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B1540"/>
+      <stop offset="1" stop-color="#102A5C"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="42" y1="150" x2="238" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6FFFE9"/>
+      <stop offset="1" stop-color="#79F25E"/>
+    </linearGradient>
+    <linearGradient id="head" x1="92" y1="68" x2="176" y2="181" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8EDBFF"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#081128" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="24" y="24" width="232" height="212" rx="54" fill="url(#panel)"/>
+  </g>
+
+  <ellipse
+    cx="140"
+    cy="154"
+    rx="84"
+    ry="24"
+    fill="none"
+    stroke="url(#ring)"
+    stroke-width="14"
+    stroke-linecap="round"
+    transform="rotate(-12 140 154)"
+  />
+
+  <path d="M114 71 101 49" fill="none" stroke="#8EDBFF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M166 71 179 49" fill="none" stroke="#8EDBFF" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="99" cy="46" r="11" fill="#FF6B8A"/>
+  <circle cx="181" cy="46" r="11" fill="#FFB84D"/>
+
+  <path
+    d="M140 62c-34 0-62 25-62 56 0 24 16 45 39 53l-3 19 19-11c2 0 4 1 7 1 34 0 62-25 62-56s-28-62-62-62Z"
+    fill="url(#head)"
+    stroke="#132445"
+    stroke-width="8"
+    stroke-linejoin="round"
+  />
+
+  <ellipse cx="117" cy="118" rx="15" ry="23" fill="#132445"/>
+  <ellipse cx="163" cy="118" rx="15" ry="23" fill="#132445"/>
+  <circle cx="122" cy="110" r="5" fill="#FFFFFF" opacity=".9"/>
+  <circle cx="168" cy="110" r="5" fill="#FFFFFF" opacity=".9"/>
+  <path d="M120 145c11 12 29 12 40 0" fill="none" stroke="#132445" stroke-width="8" stroke-linecap="round"/>
+
+  <circle cx="71" cy="89" r="8" fill="#FF6B8A"/>
+  <circle cx="206" cy="187" r="7" fill="#6FFFE9"/>
+  <circle cx="217" cy="88" r="5" fill="#FFD45A"/>
+
+  <g fill="#132445">
+    <rect x="302" y="56" width="210" height="58" rx="29" fill="#DFFBF5"/>
+    <text
+      x="407"
+      y="95"
+      text-anchor="middle"
+      font-size="34"
+      font-family="'Trebuchet MS', 'Segoe UI', sans-serif"
+      font-weight="700"
+      letter-spacing="2"
+      fill="#0D8F92"
+    >
+      THE
+    </text>
+  </g>
+
+  <text
+    x="300"
+    y="168"
+    font-size="78"
+    font-family="'Trebuchet MS', 'Segoe UI', sans-serif"
+    font-weight="900"
+    letter-spacing="1"
+    fill="#132445"
+  >
+    Viral Alien
+  </text>
+
+  <path d="M698 112c24-43 73-55 121-34" fill="none" stroke="#FF6B8A" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="818" cy="80" r="12" fill="#FF6B8A"/>
+  <circle cx="707" cy="186" r="9" fill="#79F25E"/>
+  <circle cx="744" cy="56" r="7" fill="#6FFFE9"/>
+</svg>
