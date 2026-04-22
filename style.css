@@ -430,9 +430,7 @@ body.is-playing .game-area {
   height: 88px;
   justify-self: center;
   object-fit: contain;
-  filter:
-    drop-shadow(0 0 10px rgba(94, 238, 255, 0.75))
-    drop-shadow(0 0 18px rgba(45, 125, 255, 0.42));
+  filter: none;
 }
 
 .welcome-card h2 {
