@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-label="Stealth Plane">
+  <defs>
+    <linearGradient id="stealthBody" x1="64" y1="16" x2="64" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8eff8"/>
+      <stop offset="0.45" stop-color="#8da4c3"/>
+      <stop offset="1" stop-color="#4b5c74"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 16 80 42 82 184 64 241 46 184 48 42Z" fill="url(#stealthBody)" stroke="#152232" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M64 29c10 0 18 8 18 18v33H46V47c0-10 8-18 18-18Z" fill="#f2f6fb" opacity=".92"/>
+  <path d="M8 123 54 99H74l46 24-46 24H54Z" fill="#92a8c3" stroke="#152232" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M24 155 54 142H74l30 13-30 16H54Z" fill="#d9e2ec" opacity=".88" stroke="#152232" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M46 61 29 47" fill="none" stroke="#152232" stroke-width="6" stroke-linecap="round"/>
+  <path d="M82 61 99 47" fill="none" stroke="#152232" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 228 80 198H48Z" fill="#111a27" opacity=".64"/>
+  <circle cx="64" cy="112" r="8" fill="#ffffff" opacity=".95"/>
+</svg>

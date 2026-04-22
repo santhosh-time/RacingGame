@@ -56,6 +56,13 @@ body.level-5 {
     linear-gradient(180deg, #0a1930, #0b2343 24%, #0b3b63 56%, #072944 100%);
 }
 
+body.level-6 {
+  background:
+    radial-gradient(circle at 16% 16%, rgba(255, 255, 255, 0.18), transparent 18%),
+    radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.14), transparent 20%),
+    linear-gradient(180deg, #7fd1ff 0%, #5cbcf4 100%);
+}
+
 .app {
   width: 100vw;
   min-height: 100dvh;
@@ -298,11 +305,21 @@ body.is-playing .game-area {
   border-right-color: #b7e4ff;
 }
 
+.game-area.level-6 {
+  background: linear-gradient(180deg, #8edbff 0%, #58b8ef 100%);
+  border-left-color: rgba(226, 247, 255, 0.98);
+  border-right-color: rgba(226, 247, 255, 0.98);
+}
+
 .game-area.level-4 .road-line {
   opacity: 0;
 }
 
 .game-area.level-5 .road-line {
+  opacity: 0;
+}
+
+.game-area.level-6 .road-line {
   opacity: 0;
 }
 
@@ -361,6 +378,58 @@ body.is-playing .game-area {
   opacity: 0.42;
 }
 
+.game-area.level-6::before,
+.game-area.level-6::after {
+  content: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.game-area.level-6::before {
+  background:
+    url("assets/cloud-realistic-1.svg") left 24px top 14px / 78% auto no-repeat,
+    url("assets/cloud-realistic-2.svg") right -60px top 92px / 70% auto no-repeat,
+    url("assets/cloud-realistic-2.svg") left -140px top 212px / 52% auto no-repeat,
+    url("assets/cloud-realistic-1.svg") right 18px top 308px / 44% auto no-repeat;
+  opacity: 0.98;
+  animation: cloudDriftBack 28s linear infinite;
+}
+
+.game-area.level-6::after {
+  background:
+    url("assets/cloud-realistic-2.svg") left -90px bottom 138px / 58% auto no-repeat,
+    url("assets/cloud-realistic-1.svg") right -160px bottom 34px / 66% auto no-repeat,
+    url("assets/cloud-realistic-2.svg") left 42px bottom -8px / 34% auto no-repeat,
+    url("assets/cloud-realistic-1.svg") right 32px bottom 178px / 28% auto no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 36%);
+  opacity: 0.76;
+  animation: cloudDriftFront 18s linear infinite;
+}
+
+.sky-cloud-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+  display: none;
+}
+
+.game-area.level-6 .sky-cloud-layer {
+  display: block;
+}
+
+.sky-cloud {
+  position: absolute;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  will-change: transform;
+  filter: drop-shadow(0 8px 14px rgba(255, 255, 255, 0.12));
+}
+
 .game-area.level-4 .vehicle,
 .game-area.level-4 .pickup,
 .game-area.level-4 .barricade,
@@ -368,14 +437,20 @@ body.is-playing .game-area {
 .game-area.level-5 .vehicle,
 .game-area.level-5 .pickup,
 .game-area.level-5 .barricade,
-.game-area.level-5 .laser-pointer {
+.game-area.level-5 .laser-pointer,
+.game-area.level-6 .vehicle,
+.game-area.level-6 .pickup,
+.game-area.level-6 .barricade,
+.game-area.level-6 .laser-pointer {
   z-index: 2;
 }
 
 .game-area.level-4 .message,
 .game-area.level-4 .welcome-modal,
 .game-area.level-5 .message,
-.game-area.level-5 .welcome-modal {
+.game-area.level-5 .welcome-modal,
+.game-area.level-6 .message,
+.game-area.level-6 .welcome-modal {
   z-index: 3;
 }
 
@@ -397,6 +472,42 @@ body.is-playing .game-area {
   }
   100% {
     transform: translateY(0);
+  }
+}
+
+@keyframes cloudDriftBack {
+  0% {
+    background-position:
+      left 24px top 14px,
+      right -60px top 92px,
+      left -140px top 212px,
+      right 18px top 308px;
+  }
+  100% {
+    background-position:
+      left 24px top 124px,
+      right -60px top 202px,
+      left -140px top 322px,
+      right 18px top 418px;
+  }
+}
+
+@keyframes cloudDriftFront {
+  0% {
+    background-position:
+      left -90px bottom 138px,
+      right -160px bottom 34px,
+      left 42px bottom -8px,
+      right 32px bottom 178px,
+      0 0;
+  }
+  100% {
+    background-position:
+      left -90px bottom 28px,
+      right -160px bottom -76px,
+      left 42px bottom -118px,
+      right 32px bottom 68px,
+      0 0;
   }
 }
 
@@ -536,17 +647,29 @@ body.is-playing .game-area {
 }
 
 .player-vehicle[class*="jet-"],
-.jet-preview {
+.player-vehicle[class*="plane-"],
+.player-vehicle[class*="ufo-"],
+.jet-preview,
+.plane-preview,
+.ufo-preview {
   width: 48px;
   height: 88px;
 }
 
-.player-vehicle[class*="jet-"] {
+.player-vehicle[class*="jet-"],
+.player-vehicle[class*="plane-"],
+.player-vehicle[class*="ufo-"] {
   bottom: 18px;
 }
 
 .enemy-vehicle[class*="bird-"],
 .bird-preview {
+  width: 48px;
+  height: 88px;
+}
+
+.enemy-vehicle[class*="plane-"],
+.enemy-vehicle[class*="ufo-"] {
   width: 48px;
   height: 88px;
 }
@@ -601,6 +724,41 @@ body.is-playing .game-area {
 
 .jet-stealth {
   background-image: url("assets/boat-yacht.svg");
+}
+
+.plane-private,
+.plane-golden,
+.plane-stealth {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.plane-private {
+  background-image: url("assets/plane-private.svg");
+}
+
+.plane-golden {
+  background-image: url("assets/plane-golden.svg");
+}
+
+.plane-stealth {
+  background-image: url("assets/plane-stealth.svg");
+}
+
+.ufo-metal,
+.ufo-mercury {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.ufo-metal {
+  background-image: url("assets/ufo-metal.svg");
+}
+
+.ufo-mercury {
+  background-image: url("assets/ufo-mercury.svg");
 }
 
 .bird-eagle,
@@ -797,6 +955,79 @@ body.is-playing .game-area {
 .pickup-fuel::before {
   background:
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.96) 0 28%, rgba(255, 255, 255, 0) 29% 100%);
+}
+
+.missile {
+  position: absolute;
+  width: 14px;
+  height: 30px;
+  border-radius: 999px 999px 6px 6px;
+  background:
+    linear-gradient(180deg, #fff7fb 0 22%, #ff7cd8 22% 60%, #7f4dff 60% 100%);
+  box-shadow:
+    0 0 12px rgba(255, 131, 223, 0.82),
+    0 0 24px rgba(149, 96, 255, 0.56);
+  z-index: 3;
+}
+
+.missile::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 6px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(180deg, #ffffff 0%, #ffd3f0 100%);
+}
+
+.missile::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  width: 10px;
+  height: 16px;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 80% 80%;
+  background: linear-gradient(180deg, rgba(255, 246, 157, 0.98) 0%, rgba(255, 126, 51, 0.92) 55%, rgba(255, 94, 56, 0) 100%);
+  filter: blur(1px);
+}
+
+.score-bonus-popup {
+  position: absolute;
+  min-width: 68px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #fefcff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.02em;
+  background: rgba(32, 63, 148, 0.88);
+  border: 1px solid rgba(176, 223, 255, 0.72);
+  box-shadow:
+    0 0 14px rgba(106, 205, 255, 0.46),
+    0 8px 18px rgba(11, 18, 36, 0.26);
+  pointer-events: none;
+  z-index: 4;
+  animation: score-bonus-rise 0.95s ease-out forwards;
+}
+
+@keyframes score-bonus-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.88);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-34px) scale(1.03);
+  }
 }
 
 .laser-pointer {
@@ -1418,7 +1649,7 @@ body.is-playing .game-area {
 .vehicle-picker {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(3, minmax(250px, 1fr));
   align-items: start;
   gap: 16px;
   margin-top: 8px;
@@ -1482,6 +1713,14 @@ body.is-playing .game-area {
   font-size: 0.7rem;
   color: #ffd166;
   letter-spacing: 0.04em;
+}
+
+.vehicle-option.level-six-option.is-locked::after {
+  content: "Locked Until Level 6";
+}
+
+.vehicle-option.level-seven-option.is-locked::after {
+  content: "Locked Until Level 7";
 }
 
 .vehicle-preview {

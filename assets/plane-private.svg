@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-label="Private Jet">
+  <defs>
+    <linearGradient id="privateBody" x1="64" y1="16" x2="64" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8fbff"/>
+      <stop offset="0.45" stop-color="#9ee4ff"/>
+      <stop offset="1" stop-color="#3a8eff"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 16 81 40 82 186 64 240 46 186 47 40Z" fill="url(#privateBody)" stroke="#102748" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M64 28c10 0 18 8 18 18v34H46V46c0-10 8-18 18-18Z" fill="#f6fdff" opacity=".95"/>
+  <path d="M8 124 55 100H73l47 24-47 24H55Z" fill="#8fd7ff" stroke="#102748" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M24 156 55 142H73l31 14-31 16H55Z" fill="#d6f4ff" opacity=".92" stroke="#102748" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M45 62 28 47" fill="none" stroke="#102748" stroke-width="6" stroke-linecap="round"/>
+  <path d="M83 62 100 47" fill="none" stroke="#102748" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 227 80 198H48Z" fill="#0e1b31" opacity=".66"/>
+  <circle cx="64" cy="112" r="8" fill="#ffffff" opacity=".96"/>
+</svg>

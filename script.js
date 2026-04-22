@@ -17,6 +17,7 @@ const message = document.getElementById("message");
 const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
 const welcomeLogo = document.querySelector(".welcome-logo");
+const skyCloudLayer = document.getElementById("skyCloudLayer");
 const laserPointer = document.getElementById("laserPointer");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
@@ -52,6 +53,11 @@ const vehicleClasses = [
   "jet-silver",
   "jet-gold",
   "jet-stealth",
+  "plane-private",
+  "plane-golden",
+  "plane-stealth",
+  "ufo-metal",
+  "ufo-mercury",
 ];
 const roadEnemyVehicleChoices = [
   "bike-street",
@@ -68,12 +74,24 @@ const birdEnemyChoices = [
   "bird-falcon",
   "bird-gull",
 ];
+const planeEnemyChoices = [
+  "plane-private",
+  "plane-golden",
+  "plane-stealth",
+];
+const skyCloudAssets = [
+  "assets/cloud-realistic-1.svg",
+  "assets/cloud-realistic-2.svg",
+];
 const visibleRoadLengthMeters = 21.33;
 const targetFramesPerSecond = 60;
 const boosterSpawnTop = -140;
 const boosterCollectionZoneTop = 340;
 const boosterSafetyDistance = 170;
 const boosterWidth = 38;
+const missileWidth = 14;
+const missileHeight = 30;
+const missileLaunchIntervalMs = 260;
 const adminSessionKey = "viral-racing-admin";
 const adminAccessCode = "viraladmin";
 const accessWindowHours = 24;
@@ -90,7 +108,9 @@ const levelFourBaseSpeed = 9.03;
 const levelFourTargetSpeed = 12.5;
 const levelFourEndScore = 35000;
 const levelFiveStartScore = 35000;
-const levelFiveEndScore = 50000;
+const levelSixStartScore = 45000;
+const levelFiveEndScore = levelSixStartScore;
+const levelSixEndScore = 70000;
 const levelOneEndScore = 8000;
 const levelOneTargetKmph = 70;
 const levelOneWarmupDurationMs = 5000;
@@ -111,6 +131,7 @@ const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
 const fuelDrainStep = 10;
 const fuelPickupRestore = 10;
+const airKillBonusScore = 100;
 const barricadeSpawnTop = -140;
 const barricadeSpawnGap = 1200;
 
@@ -129,6 +150,7 @@ const state = {
     ArrowRight: false,
   },
   enemies: [],
+  skyClouds: [],
   nextBoosterScore: 2000,
   animationId: 0,
   vehicleSoundEnabled: false,
@@ -146,6 +168,7 @@ const state = {
   livesRemaining: 0,
   pickup: null,
   pickupType: "",
+  missiles: [],
   barricades: [],
   nextLevelScore: 8000,
   levelStartScore: 0,
@@ -160,6 +183,7 @@ const state = {
   levelWarmupStartAt: 0,
   levelWarmupUntil: 0,
   laserActiveUntil: 0,
+  nextMissileAt: 0,
   invincibleUntil: 0,
   levelFourSelectionOpen: false,
   pointer: {
@@ -242,6 +266,10 @@ function updateLivesDisplay() {
   }
 }
 
+function laserPickupGap(levelNumber = state.level) {
+  return levelNumber >= 6 ? 800 : 1000;
+}
+
 function updateFuelDisplay() {
   if (!fuelCard || !fuelDisplay) {
     return;
@@ -255,11 +283,131 @@ function updateFuelDisplay() {
 }
 
 function applyLevelTheme() {
-  const levelClass = state.level >= 5 ? "level-5" : state.level >= 4 ? "level-4" : `level-${state.level}`;
-  document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
-  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
+  const levelClass = state.level >= 6 ? "level-6" : state.level >= 5 ? "level-5" : state.level >= 4 ? "level-4" : `level-${state.level}`;
+  document.body.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6");
+  gameArea.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5", "level-6");
   document.body.classList.add(levelClass);
   gameArea.classList.add(levelClass);
+  if (isSkyLevel()) {
+    ensureSkyClouds(true);
+  } else {
+    clearSkyClouds();
+  }
+}
+
+function isWaterLevel(levelNumber = state.level) {
+  return levelNumber === 4 || levelNumber === 5;
+}
+
+function isSkyLevel(levelNumber = state.level) {
+  return levelNumber >= 6;
+}
+
+function clearSkyClouds() {
+  state.skyClouds.forEach((cloud) => cloud.element.remove());
+  state.skyClouds = [];
+}
+
+function randomSkyCloudMetrics() {
+  const sizeBand = Math.random();
+  let width = 110;
+  if (sizeBand < 0.34) {
+    width = 84 + Math.random() * 46;
+  } else if (sizeBand < 0.74) {
+    width = 130 + Math.random() * 70;
+  } else {
+    width = 200 + Math.random() * 80;
+  }
+
+  return {
+    width,
+    height: width * (0.34 + Math.random() * 0.08),
+    speedFactor: 0.24 + Math.random() * 0.22,
+    opacity: 0.45 + Math.random() * 0.35,
+    asset: skyCloudAssets[Math.floor(Math.random() * skyCloudAssets.length)],
+  };
+}
+
+function createSkyCloud(startAbove = false) {
+  if (!skyCloudLayer) {
+    return null;
+  }
+
+  const metrics = randomSkyCloudMetrics();
+  const element = document.createElement("div");
+  element.className = "sky-cloud";
+  element.style.width = `${metrics.width}px`;
+  element.style.height = `${metrics.height}px`;
+  element.style.opacity = String(metrics.opacity);
+  element.style.backgroundImage = `url("${metrics.asset}")`;
+
+  const x = Math.random() * Math.max(12, gameBounds.width - metrics.width - 12);
+  const y = startAbove
+    ? -metrics.height - Math.random() * gameBounds.height
+    : Math.random() * (gameBounds.height - metrics.height);
+
+  element.style.transform = `translate(${x}px, ${y}px)`;
+  skyCloudLayer.appendChild(element);
+
+  return {
+    element,
+    x,
+    y,
+    width: metrics.width,
+    height: metrics.height,
+    speedFactor: metrics.speedFactor,
+  };
+}
+
+function ensureSkyClouds(reset = false) {
+  if (!isSkyLevel() || !skyCloudLayer) {
+    clearSkyClouds();
+    return;
+  }
+
+  if (reset) {
+    clearSkyClouds();
+  }
+
+  while (state.skyClouds.length < 10) {
+    const cloud = createSkyCloud(state.skyClouds.length >= 4);
+    if (!cloud) {
+      break;
+    }
+    state.skyClouds.push(cloud);
+  }
+}
+
+function recycleSkyCloud(cloud) {
+  const metrics = randomSkyCloudMetrics();
+  cloud.width = metrics.width;
+  cloud.height = metrics.height;
+  cloud.speedFactor = metrics.speedFactor;
+  cloud.x = Math.random() * Math.max(12, gameBounds.width - metrics.width - 12);
+  cloud.y = -metrics.height - Math.random() * 180;
+  cloud.element.style.width = `${metrics.width}px`;
+  cloud.element.style.height = `${metrics.height}px`;
+  cloud.element.style.opacity = String(metrics.opacity);
+  cloud.element.style.backgroundImage = `url("${metrics.asset}")`;
+  cloud.element.style.transform = `translate(${cloud.x}px, ${cloud.y}px)`;
+}
+
+function updateSkyClouds(deltaFrames = 1) {
+  if (!isSkyLevel()) {
+    clearSkyClouds();
+    return;
+  }
+
+  ensureSkyClouds();
+
+  const baseDrift = Math.max(0.55, state.currentSpeed * 0.14);
+  state.skyClouds.forEach((cloud) => {
+    cloud.y += baseDrift * cloud.speedFactor * deltaFrames;
+    cloud.element.style.transform = `translate(${cloud.x}px, ${cloud.y}px)`;
+    if (cloud.y > gameBounds.height + 24) {
+      recycleSkyCloud(cloud);
+    }
+  });
 }
 
 function updatePlayerInvincibility() {
@@ -349,6 +497,12 @@ function levelEndScore(levelNumber) {
   }
   if (levelNumber === 5) {
     return levelFiveEndScore;
+  }
+  if (levelNumber === 6) {
+    return levelSixEndScore;
+  }
+  if (levelNumber >= 7) {
+    return 0;
   }
   return 0;
 }
@@ -1565,18 +1719,41 @@ function isLevelFourVehicleUnlocked() {
   return state.level >= 4;
 }
 
+function isLevelSixVehicleUnlocked() {
+  return state.level >= 6;
+}
+
+function isLevelSevenVehicleUnlocked() {
+  return state.level >= 7;
+}
+
 function updateVehicleUnlockUI() {
   const { vehicleOptions } = overlayRefs();
-  const unlocked = isLevelFourVehicleUnlocked();
+  const levelFourUnlocked = isLevelFourVehicleUnlocked();
+  const levelSixUnlocked = isLevelSixVehicleUnlocked();
+  const levelSevenUnlocked = isLevelSevenVehicleUnlocked();
 
   vehicleOptions.forEach((option) => {
     const isLevelFourOnly = option.dataset.levelFourOnly === "true";
-    if (!isLevelFourOnly) {
+    const isLevelSixOnly = option.dataset.levelSixOnly === "true";
+    const isLevelSevenOnly = option.dataset.levelSevenOnly === "true";
+
+    if (isLevelFourOnly) {
+      option.disabled = !levelFourUnlocked;
+      option.classList.toggle("is-locked", !levelFourUnlocked);
       return;
     }
 
-    option.disabled = !unlocked;
-    option.classList.toggle("is-locked", !unlocked);
+    if (isLevelSixOnly) {
+      option.disabled = !levelSixUnlocked;
+      option.classList.toggle("is-locked", !levelSixUnlocked);
+      return;
+    }
+
+    if (isLevelSevenOnly) {
+      option.disabled = !levelSevenUnlocked;
+      option.classList.toggle("is-locked", !levelSevenUnlocked);
+    }
   });
 }
 
@@ -2192,6 +2369,11 @@ function prettifyVehicleName(vehicleName = state.selectedVehicle) {
     "jet-silver": "Small Boat",
     "jet-gold": "Ship",
     "jet-stealth": "Yacht",
+    "plane-private": "Private Jet",
+    "plane-golden": "Golden Plane",
+    "plane-stealth": "Sky Plane",
+    "ufo-metal": "Metal UFO",
+    "ufo-mercury": "Mercury UFO",
     "bird-eagle": "Cargo Ship",
     "bird-falcon": "Speed Boat",
     "bird-gull": "Patrol Ship",
@@ -2213,6 +2395,11 @@ function vehicleAccentColor(vehicleName = state.selectedVehicle) {
     "jet-silver": "#b9d7ff",
     "jet-gold": "#ffd166",
     "jet-stealth": "#a7b2c2",
+    "plane-private": "#78c8ff",
+    "plane-golden": "#ffd166",
+    "plane-stealth": "#a7b2c2",
+    "ufo-metal": "#c6d6e6",
+    "ufo-mercury": "#ff9dff",
   };
 
   return colors[vehicleName] || "#73efff";
@@ -2221,7 +2408,7 @@ function vehicleAccentColor(vehicleName = state.selectedVehicle) {
 function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   const accent = vehicleAccentColor(vehicleName);
   const isBike = vehicleName.startsWith("bike-");
-  const isJet = vehicleName.startsWith("jet-");
+  const isJet = vehicleName.startsWith("jet-") || vehicleName.startsWith("plane-") || vehicleName.startsWith("ufo-");
   const isTruck = vehicleName === "car-truck";
   const isElectric = vehicleName.includes("electric");
   const isMuscle = vehicleName === "car-muscle";
@@ -2378,6 +2565,38 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
 
 function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.clearRect(0, 0, width, height);
+
+  if (levelNumber >= 6) {
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
+    skyGradient.addColorStop(0, "#7ed4ff");
+    skyGradient.addColorStop(0.34, "#58bdf6");
+    skyGradient.addColorStop(0.7, "#1f7ec7");
+    skyGradient.addColorStop(1, "#0b3460");
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+    const cloudBands = [
+      [170, 180, 230, 48],
+      [760, 240, 260, 54],
+      [340, 430, 280, 56],
+      [850, 620, 210, 44],
+    ];
+    cloudBands.forEach(([x, y, w, h]) => {
+      ctx.beginPath();
+      ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.beginPath();
+    ctx.ellipse(220, 980, 320, 80, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(860, 1260, 260, 68, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
 
   if (levelNumber === 2) {
     const muddyGradient = ctx.createLinearGradient(0, 0, 0, height);
@@ -2632,7 +2851,8 @@ function createScoreCardImage() {
   const scoreCardHighScore = Math.max(state.bestScore, currentRunScore);
   const useCurrentRunDetails = currentRunScore >= state.bestScore;
   const scoreCardBackgroundLevel = Math.max(1, Number(state.level) || 1);
-  const isWaterCard = scoreCardBackgroundLevel >= 4;
+  const isWaterCard = isWaterLevel(scoreCardBackgroundLevel);
+  const isSkyCard = isSkyLevel(scoreCardBackgroundLevel);
   const scoreCardVehicle = useCurrentRunDetails
     ? state.selectedVehicle
     : (state.bestScoreVehicle || state.selectedVehicle);
@@ -2642,21 +2862,21 @@ function createScoreCardImage() {
 
   drawScoreCardBackground(ctx, scoreCardBackgroundLevel, canvas.width, canvas.height);
 
-  ctx.fillStyle = isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.46)";
+  ctx.fillStyle = isSkyCard ? "rgba(18, 74, 120, 0.2)" : isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.46)";
   ctx.fillRect(40, 40, 1000, 1840);
-  ctx.strokeStyle = isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
+  ctx.strokeStyle = isSkyCard ? "rgba(230, 248, 255, 0.34)" : isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
   ctx.lineWidth = 8;
   ctx.strokeRect(40, 40, 1000, 1840);
 
-  const headerFill = isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
-  const panelFill = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
+  const headerFill = isSkyCard ? "rgba(40, 118, 176, 0.2)" : isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
+  const panelFill = isSkyCard ? "rgba(17, 65, 104, 0.46)" : isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
   ctx.fillStyle = headerFill;
   ctx.fillRect(110, 90, 860, 200);
-  ctx.strokeStyle = isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
+  ctx.strokeStyle = isSkyCard ? "rgba(240, 250, 255, 0.28)" : isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
   ctx.lineWidth = 5;
   ctx.strokeRect(110, 90, 860, 200);
 
-  ctx.fillStyle = isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
+  ctx.fillStyle = isSkyCard ? "rgba(255, 255, 255, 0.08)" : isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
   ctx.fillRect(120, 300, 840, 1320);
 
   if (isWaterCard) {
@@ -2787,7 +3007,7 @@ function midiToFrequency(noteNumber) {
 }
 
 function currentMusicLevel() {
-  return state.level >= 5 ? 5 : Math.max(1, state.level || 1);
+  return state.level >= 6 ? 6 : state.level >= 5 ? 5 : Math.max(1, state.level || 1);
 }
 
 function musicTheme(levelNumber = currentMusicLevel()) {
@@ -3146,7 +3366,7 @@ function updateEngineSound() {
 }
 
 async function startWaterSound() {
-  if (!state.backgroundSoundEnabled || state.level < 4) {
+  if (!state.backgroundSoundEnabled || !isWaterLevel()) {
     return;
   }
 
@@ -3194,7 +3414,7 @@ function updateWaterSound() {
   }
 
   const now = audioState.context.currentTime;
-  const targetGain = state.active && state.level >= 4 ? 0.56 : 0.0001;
+  const targetGain = state.active && isWaterLevel() ? 0.56 : 0.0001;
   const targetFrequency = 340 + state.currentSpeed * 18;
 
   audioState.waterFilter.frequency.cancelScheduledValues(now);
@@ -3368,7 +3588,7 @@ function vehicleWidth() {
   if (state.selectedVehicle.startsWith("bike-")) {
     return gameBounds.bikeWidth;
   }
-  if (state.selectedVehicle.startsWith("jet-")) {
+  if (state.selectedVehicle.startsWith("jet-") || state.selectedVehicle.startsWith("plane-") || state.selectedVehicle.startsWith("ufo-")) {
     return gameBounds.jetWidth;
   }
   return gameBounds.carWidth;
@@ -3396,7 +3616,7 @@ function enemyVehicleWidth(vehicleName) {
   if (vehicleName.startsWith("bird-")) {
     return gameBounds.birdWidth;
   }
-  if (vehicleName.startsWith("jet-")) {
+  if (vehicleName.startsWith("jet-") || vehicleName.startsWith("plane-") || vehicleName.startsWith("ufo-")) {
     return gameBounds.jetWidth;
   }
   return gameBounds.carWidth;
@@ -3438,7 +3658,11 @@ function barricadeWidth() {
 }
 
 function pickEnemyVehicle() {
-  const poolSource = state.level >= 4 ? birdEnemyChoices : roadEnemyVehicleChoices;
+  const poolSource = isSkyLevel()
+    ? planeEnemyChoices
+    : isWaterLevel()
+      ? birdEnemyChoices
+      : roadEnemyVehicleChoices;
   const choices = poolSource.filter((vehicleName) => vehicleName !== state.selectedVehicle);
   const pool = choices.length > 0 ? choices : poolSource;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -3477,7 +3701,11 @@ function positionsOverlap(leftA, widthA, leftB, widthB, gap = 18) {
 }
 
 function chooseEnemyX(excludedXs = [], preferPlayerX = false) {
-  const width = state.level >= 4 ? gameBounds.birdWidth : gameBounds.carWidth;
+  const width = isSkyLevel()
+    ? gameBounds.jetWidth
+    : isWaterLevel()
+      ? gameBounds.birdWidth
+      : gameBounds.carWidth;
   const playerTargetX = clampVehicleLeft(playerCenterX() - width / 2, width);
 
   if (preferPlayerX) {
@@ -3664,6 +3892,35 @@ function clearBooster() {
   }
 }
 
+function clearMissiles() {
+  state.missiles.forEach((missile) => missile.remove());
+  state.missiles = [];
+  state.nextMissileAt = 0;
+}
+
+function respawnEnemy(enemy, respawnTop, forcePlayerLane = false) {
+  const occupiedLanes = state.enemies
+    .filter((item) => item !== enemy)
+    .map((item) => ({
+      left: parseFloat(item.style.left),
+      width: enemyVehicleWidth(item.dataset.vehicle || "car-sport"),
+    }));
+  const nextLane = chooseEnemyX(
+    occupiedLanes.map((item) => item.left),
+    forcePlayerLane
+  );
+  const nextVehicle = pickEnemyVehicle();
+  const nextWidth = enemyVehicleWidth(nextVehicle);
+  const adjustedLeft = clampVehicleLeft(nextLane, nextWidth);
+  const overlapsExisting = occupiedLanes.some((item) =>
+    positionsOverlap(adjustedLeft, nextWidth, item.left, item.width, 20)
+  );
+  enemy.dataset.vehicle = nextVehicle;
+  enemy.className = `vehicle enemy-vehicle ${nextVehicle}`;
+  enemy.style.left = `${overlapsExisting ? clampVehicleLeft(nextLane, nextWidth) : adjustedLeft}px`;
+  enemy.style.top = `${respawnTop}px`;
+}
+
 function spawnBarricades() {
   if (state.level !== 2 || state.score < state.nextBarricadeScore || state.barricades.length >= 2) {
     return;
@@ -3696,7 +3953,23 @@ function spawnBooster() {
     if (state.score >= state.nextLaserScore) {
       state.pickupType = "laser";
       state.pickup = createPickup(boosterSpawnTop, "laser");
-      state.nextLaserScore += 1000;
+      state.nextLaserScore += laserPickupGap();
+    }
+    return;
+  }
+
+  if (state.level >= 6) {
+    if (state.score >= state.nextLaserScore) {
+      state.pickupType = "laser";
+      state.pickup = createPickup(boosterSpawnTop, "laser");
+      state.nextLaserScore += laserPickupGap();
+      return;
+    }
+
+    if (state.score >= state.nextFuelScore) {
+      state.pickupType = "fuel";
+      state.pickup = createPickup(boosterSpawnTop, "fuel");
+      state.nextFuelScore += 700;
     }
     return;
   }
@@ -3712,7 +3985,7 @@ function spawnBooster() {
     if (state.score >= state.nextLaserScore) {
       state.pickupType = "laser";
       state.pickup = createPickup(boosterSpawnTop, "laser");
-      state.nextLaserScore += 1000;
+      state.nextLaserScore += laserPickupGap();
     }
   }
 }
@@ -3801,20 +4074,112 @@ function updateLaserPointer() {
     return;
   }
 
-  const laserActive = Date.now() < state.laserActiveUntil;
+  const laserActive = Date.now() < state.laserActiveUntil && !isSkyLevel();
   laserPointer.classList.toggle("hidden", !laserActive);
 }
 
 function activateLaserMode() {
   state.laserActiveUntil = Date.now() + laserDurationMs;
+  state.nextMissileAt = Date.now();
   playBoosterSound();
   updateLaserPointer();
   refreshSpeed();
 }
 
+function launchMissile() {
+  if (!isSkyLevel()) {
+    return;
+  }
+
+  const missile = document.createElement("div");
+  missile.className = "missile";
+  const playerWidth = playerCar.offsetWidth || gameBounds.jetWidth;
+  missile.style.left = `${state.playerX + playerWidth / 2 - missileWidth / 2}px`;
+  missile.style.top = `${playerCar.offsetTop - missileHeight + 8}px`;
+  gameArea.appendChild(missile);
+  state.missiles.push(missile);
+}
+
+function updateMissiles(deltaFrames = 1) {
+  if (!isSkyLevel()) {
+    clearMissiles();
+    return;
+  }
+
+  const laserActive = Date.now() < state.laserActiveUntil;
+  if (laserActive && Date.now() >= state.nextMissileAt) {
+    launchMissile();
+    state.nextMissileAt = Date.now() + missileLaunchIntervalMs;
+  }
+
+  for (let index = state.missiles.length - 1; index >= 0; index -= 1) {
+    const missile = state.missiles[index];
+    const missileLeft = parseFloat(missile.style.left);
+    const currentTop = parseFloat(missile.style.top);
+    const nextTop = currentTop - Math.max(5.8, state.currentSpeed * 0.88) * deltaFrames;
+
+    if (nextTop < -missileHeight - 12) {
+      missile.remove();
+      state.missiles.splice(index, 1);
+      continue;
+    }
+
+    missile.style.top = `${nextTop}px`;
+
+    const missileCenterX = missileLeft + missileWidth / 2;
+    const missileSweepTop = nextTop;
+    const missileSweepBottom = currentTop + missileHeight;
+    let hitEnemy = false;
+    for (const enemy of state.enemies) {
+      const enemyLeft = parseFloat(enemy.style.left);
+      const enemyTop = parseFloat(enemy.style.top);
+      const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "plane-private");
+      const enemyHeight = enemy.offsetHeight || 88;
+      const enemyCenterX = enemyLeft + enemyWidth / 2;
+      const horizontalGap = Math.abs(missileCenterX - enemyCenterX);
+      const horizontalHit = horizontalGap <= (enemyWidth * 0.44 + missileWidth * 0.7);
+      const verticalHit = missileSweepBottom >= enemyTop && missileSweepTop <= enemyTop + enemyHeight;
+
+      if (horizontalHit && verticalHit) {
+        showScoreBonusPopup(
+          enemyLeft + Math.max(0, enemyWidth / 2 - 34),
+          enemyTop + Math.max(10, enemyHeight * 0.2),
+          airKillBonusScore
+        );
+        respawnEnemy(enemy, state.level >= 4 ? -140 : -220, false);
+        addScoreBonus(airKillBonusScore);
+        hitEnemy = true;
+        break;
+      }
+    }
+
+    if (hitEnemy) {
+      missile.remove();
+      state.missiles.splice(index, 1);
+    }
+  }
+}
+
 function increaseFuel(amount) {
   state.fuelPercent = Math.min(100, state.fuelPercent + amount);
   updateFuelDisplay();
+}
+
+function addScoreBonus(amount) {
+  state.score += amount;
+  scoreDisplay.textContent = String(Math.floor(state.score));
+}
+
+function showScoreBonusPopup(left, top, amount) {
+  const popup = document.createElement("div");
+  popup.className = "score-bonus-popup";
+  popup.textContent = `+${amount} points`;
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+  gameArea.appendChild(popup);
+  window.setTimeout(() => {
+    popup.remove();
+  }, 950);
 }
 
 function handleFuelDrain() {
@@ -3858,16 +4223,22 @@ async function showCountdownOverlay(title, subtitle = "") {
   syncGameplayChrome();
 }
 
-function showLevelFourSelection() {
+function showLevelFourSelection(targetLevel = 4) {
   state.levelFourSelectionOpen = true;
+  const planeUnlocked = targetLevel >= 6 || isLevelSixVehicleUnlocked();
+  const ufoUnlocked = targetLevel >= 7 || isLevelSevenVehicleUnlocked();
+  const showUfoOnly = targetLevel >= 7;
+  const showPlaneOnly = targetLevel >= 6;
+  const headingLevel = targetLevel >= 4 ? targetLevel : 4;
   message.innerHTML = `
     <div class="level-four-panel">
       <p class="countdown-eyebrow">Congratulations</p>
-      <h2>Welcome To Level 4</h2>
-      <p>You are entering open water. Choose your boat to begin the next race.</p>
+      <h2>Welcome To Level ${headingLevel}</h2>
+      <p>${showUfoOnly ? "Final Level is unlocked. Choose your UFO to begin the next race." : showPlaneOnly ? "Aeroplane access is unlocked. Choose your aircraft to begin the next race." : "You are entering open water. Choose your ride to begin the next race."}</p>
       <div class="vehicle-group level-four-group">
-        <h3>Choose Your Boat</h3>
+        <h3>${showUfoOnly ? "Choose Your UFO" : showPlaneOnly ? "Choose Your Aeroplane" : "Choose Your Boat Or Aeroplane"}</h3>
         <div class="vehicle-grid jet-grid">
+          ${showPlaneOnly || showUfoOnly ? "" : `
           <button class="vehicle-option jet-select-option" data-jet="jet-silver" type="button">
             <span class="vehicle-preview jet-preview jet-silver"></span>
             <span>Small Boat</span>
@@ -3880,6 +4251,31 @@ function showLevelFourSelection() {
             <span class="vehicle-preview jet-preview jet-stealth"></span>
             <span>Yacht</span>
           </button>
+          `}
+          ${showUfoOnly ? "" : `
+          <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-private" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+            <span class="vehicle-preview plane-preview plane-private"></span>
+            <span>Private Jet</span>
+          </button>
+          <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-golden" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+            <span class="vehicle-preview plane-preview plane-golden"></span>
+            <span>Golden Plane</span>
+          </button>
+          <button class="vehicle-option jet-select-option level-six-option ${planeUnlocked ? "" : "is-locked"}" data-jet="plane-stealth" data-level-six-only="true" type="button" ${planeUnlocked ? "" : "disabled"}>
+            <span class="vehicle-preview plane-preview plane-stealth"></span>
+            <span>Sky Plane</span>
+          </button>
+          `}
+          ${showUfoOnly ? `
+          <button class="vehicle-option jet-select-option level-seven-option ${ufoUnlocked ? "" : "is-locked"}" data-jet="ufo-metal" data-level-seven-only="true" type="button" ${ufoUnlocked ? "" : "disabled"}>
+            <span class="vehicle-preview ufo-preview ufo-metal"></span>
+            <span>Metal UFO</span>
+          </button>
+          <button class="vehicle-option jet-select-option level-seven-option ${ufoUnlocked ? "" : "is-locked"}" data-jet="ufo-mercury" data-level-seven-only="true" type="button" ${ufoUnlocked ? "" : "disabled"}>
+            <span class="vehicle-preview ufo-preview ufo-mercury"></span>
+            <span>Mercury UFO</span>
+          </button>
+          ` : ""}
         </div>
       </div>
     </div>
@@ -3918,7 +4314,11 @@ async function beginLevel(levelNumber) {
         ? "Skyline sprint. Watch your fuel."
         : levelNumber === 4
           ? "Ride the open water. Ships ahead."
-          : "Level 5 begins. Keep the water run alive.";
+          : levelNumber === 5
+            ? "Level 5 begins. Keep the water run alive."
+            : levelNumber === 6
+              ? "Level 6 unlocked. Aeroplane access is now live."
+              : "Level 7 test flight. Push the late-game run.";
 
   playLevelUpSound();
   await showCountdownOverlay(title, subtitle);
@@ -3955,7 +4355,7 @@ async function beginLevel(levelNumber) {
     state.levelWarmupUntil = state.levelWarmupStartAt + levelWarmupDuration(levelNumber);
     state.boostLevel = 0;
     state.boostActiveUntil = 0;
-    state.nextLaserScore = Math.max(state.score + 1000, 2000);
+    state.nextLaserScore = Math.max(state.score + laserPickupGap(levelNumber), 2000);
     state.nextLevelScore = levelTwoEndScore;
     state.nextBarricadeScore = Math.max(state.score + 700, 9200);
     clearBooster();
@@ -3966,7 +4366,7 @@ async function beginLevel(levelNumber) {
       state.levelWarmupStartAt = Date.now();
       state.levelWarmupUntil = state.levelWarmupStartAt + levelWarmupDuration(levelNumber);
       state.boostActiveUntil = 0;
-      state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
+      state.nextLaserScore = Math.max(state.score + laserPickupGap(levelNumber), state.nextLaserScore);
       state.nextFuelScore = Math.max(state.score + 700, 8700);
       state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
       state.fuelPercent = 100;
@@ -3976,7 +4376,7 @@ async function beginLevel(levelNumber) {
       state.levelWarmupStartAt = Date.now();
       state.levelWarmupUntil = state.levelWarmupStartAt + levelWarmupDuration(levelNumber);
       state.boostActiveUntil = 0;
-      state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
+      state.nextLaserScore = Math.max(state.score + laserPickupGap(levelNumber), state.nextLaserScore);
       state.nextFuelScore = Math.max(state.score + 700, state.nextFuelScore);
       state.nextFuelDrainScore = Math.max(state.score + 1000, state.nextFuelDrainScore);
       clearBooster();
@@ -3987,15 +4387,17 @@ async function beginLevel(levelNumber) {
   state.levelTwoWarmupUntil = 0;
   state.levelOneWarmupStartAt = 0;
   state.levelOneWarmupUntil = 0;
+  state.nextMissileAt = 0;
 
   clearBarricades();
+  clearMissiles();
   resetEnemies();
   state.playerX = middleLaneX();
   updatePlayerVerticalPosition();
   refreshSpeed();
   await primeMobileAudio();
   await startEngineSound();
-  if (levelNumber >= 4) {
+  if (isWaterLevel(levelNumber)) {
     await startWaterSound();
   }
   await startBackgroundMusic(true);
@@ -4019,6 +4421,12 @@ function adminLevelStartScore(levelNumber) {
   }
   if (levelNumber === 5) {
     return levelFiveStartScore;
+  }
+  if (levelNumber === 6) {
+    return levelSixStartScore;
+  }
+  if (levelNumber >= 7) {
+    return levelSixEndScore;
   }
   return 0;
 }
@@ -4049,6 +4457,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.levelTwoWarmupStartAt = 0;
   state.levelTwoWarmupUntil = 0;
   state.laserActiveUntil = 0;
+  state.nextMissileAt = 0;
   state.invincibleUntil = 0;
   state.reviveRunning = false;
   state.paused = false;
@@ -4068,6 +4477,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   resetEnemies();
   clearBarricades();
   clearBooster();
+  clearMissiles();
   state.pickupType = "";
   playerCar.style.left = `${state.playerX}px`;
   scoreDisplay.textContent = String(Math.floor(startScore));
@@ -4102,9 +4512,9 @@ async function startAdminLevel() {
   toggleAdminPanel(false);
   updateCloudStatus(`Admin jump ready. Launching Level ${levelNumber}.`, true);
 
-  if (levelNumber === 4) {
-    const selectedBoat = await showLevelFourSelection();
-    applyVehicleSelection(selectedBoat || "jet-silver");
+  if (levelNumber >= 4) {
+    const selectedBoat = await showLevelFourSelection(levelNumber);
+    applyVehicleSelection(selectedBoat || (levelNumber >= 7 ? "ufo-metal" : levelNumber >= 6 ? "plane-private" : "jet-silver"));
     await initializeRun(levelNumber, startScore);
     return;
   }
@@ -4163,6 +4573,7 @@ async function handleVehicleCrash() {
     resetEnemies();
     clearBarricades();
     clearBooster();
+    clearMissiles();
     state.baseSpeed = 0;
     state.currentSpeed = 0;
     refreshSpeed();
@@ -4191,7 +4602,7 @@ async function handleVehicleCrash() {
     state.invincibleUntil = Date.now() + 1800;
     await primeMobileAudio();
     await startEngineSound();
-    if (state.level >= 4) {
+    if (isWaterLevel()) {
       await startWaterSound();
     }
     await startBackgroundMusic(true);
@@ -4205,7 +4616,7 @@ async function handleVehicleCrash() {
     return;
   }
 
-  endGame(state.level >= 4 ? "Shipwreck!" : "Crash!");
+  endGame(isSkyLevel() ? "Air Crash!" : isWaterLevel() ? "Shipwreck!" : "Crash!");
 }
 
 function isColliding(a, b) {
@@ -4240,7 +4651,6 @@ function updateEnemies(deltaFrames = 1) {
   const laserActive = Date.now() < state.laserActiveUntil;
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
-    const enemyWidth = enemyVehicleWidth(enemy.dataset.vehicle || "car-sport");
     const respawnTop = state.level >= 4 ? -140 : -220;
     const movementStep = state.level >= 4
       ? Math.max(2.2, state.currentSpeed * 0.58) * deltaFrames
@@ -4248,33 +4658,15 @@ function updateEnemies(deltaFrames = 1) {
     let nextTop = top + movementStep;
 
     if (nextTop > gameBounds.height) {
-      nextTop = respawnTop;
       state.enemyRespawns += 1;
-      const occupiedLanes = state.enemies
-        .filter((item) => item !== enemy)
-        .map((item) => ({
-          left: parseFloat(item.style.left),
-          width: enemyVehicleWidth(item.dataset.vehicle || "car-sport"),
-        }));
       const forcePlayerLane = state.level >= 4 ? Math.random() < 0.22 : state.enemyRespawns % 2 === 0;
-      const nextLane = chooseEnemyX(
-        occupiedLanes.map((item) => item.left),
-        forcePlayerLane
-      );
-      const nextVehicle = pickEnemyVehicle();
-      const nextWidth = enemyVehicleWidth(nextVehicle);
-      const adjustedLeft = clampVehicleLeft(nextLane, nextWidth);
-      const overlapsExisting = occupiedLanes.some((item) =>
-        positionsOverlap(adjustedLeft, nextWidth, item.left, item.width, 20)
-      );
-      enemy.dataset.vehicle = nextVehicle;
-      enemy.className = `vehicle enemy-vehicle ${nextVehicle}`;
-      enemy.style.left = `${overlapsExisting ? clampVehicleLeft(nextLane, enemyWidth) : adjustedLeft}px`;
+      respawnEnemy(enemy, respawnTop, forcePlayerLane);
+      continue;
     }
 
     enemy.style.top = `${nextTop}px`;
 
-    if (laserActive && laserPointer && !laserPointer.classList.contains("hidden")) {
+    if (!isSkyLevel() && laserActive && laserPointer && !laserPointer.classList.contains("hidden")) {
       const enemyRect = enemy.getBoundingClientRect();
       const pointerRect = laserPointer.getBoundingClientRect();
       const pointerInsideEnemy = !(
@@ -4285,17 +4677,7 @@ function updateEnemies(deltaFrames = 1) {
       );
 
       if (pointerInsideEnemy) {
-        nextTop = respawnTop;
-        const nextLane = chooseEnemyX(
-          state.enemies.filter((item) => item !== enemy).map((item) => parseFloat(item.style.left)),
-          false
-        );
-        const nextVehicle = pickEnemyVehicle();
-        const nextWidth = enemyVehicleWidth(nextVehicle);
-        enemy.dataset.vehicle = nextVehicle;
-        enemy.className = `vehicle enemy-vehicle ${nextVehicle}`;
-        enemy.style.left = `${clampVehicleLeft(nextLane, nextWidth)}px`;
-        enemy.style.top = `${nextTop}px`;
+        respawnEnemy(enemy, respawnTop, false);
         continue;
       }
     }
@@ -4381,11 +4763,13 @@ async function gameLoop(frameTime = performance.now()) {
   updateSpeedRamp();
   refreshSpeed();
   updateRoadLines(deltaFrames);
+  updateSkyClouds(deltaFrames);
   updatePlayer(deltaFrames);
   updatePlayerInvincibility();
   spawnBooster();
   spawnBarricades();
   updateEnemies(deltaFrames);
+  updateMissiles(deltaFrames);
   updateBarricades(deltaFrames);
   updateBooster(deltaFrames);
   updateLaserPointer();
@@ -4424,6 +4808,24 @@ async function gameLoop(frameTime = performance.now()) {
     return;
   }
 
+  if (state.level === 5 && state.score >= levelSixStartScore && !state.pendingTransition) {
+    await beginLevel(6);
+    return;
+  }
+
+  if (state.level === 6 && state.score >= levelSixEndScore && !state.pendingTransition && !state.levelFourSelectionOpen) {
+    state.pendingTransition = true;
+    state.active = false;
+    cancelAnimationFrame(state.animationId);
+    stopEngineSound();
+    stopWaterSound();
+    clearBooster();
+    const selectedUfo = await showLevelFourSelection(7);
+    applyVehicleSelection(selectedUfo || "ufo-metal");
+    await beginLevel(7);
+    return;
+  }
+
   if (state.level >= 4) {
     clearBarricades();
   }
@@ -4459,6 +4861,7 @@ function endGame(title = "Crash!") {
   stopEngineSound();
   stopWaterSound();
   stopBackgroundMusic();
+  clearMissiles();
   playCrashSound();
   playGameOverSound();
   startGameOverMusic(true);
@@ -4519,7 +4922,7 @@ async function resumeGame() {
   await primeMobileAudio();
   if (state.vehicleSoundEnabled || state.backgroundSoundEnabled) {
     await startEngineSound();
-    if (state.level >= 4) {
+    if (isWaterLevel()) {
       await startWaterSound();
     }
     await startBackgroundMusic(true);
@@ -4635,7 +5038,7 @@ backgroundSoundButton?.addEventListener("click", async () => {
   updateSoundButtons();
 
   if (nextEnabled) {
-    if (state.level >= 4) {
+    if (isWaterLevel()) {
       await startWaterSound();
     }
     await startBackgroundMusic(true);
@@ -4695,7 +5098,7 @@ touchHoldButtons.forEach((button) => {
 
     if ((state.vehicleSoundEnabled || state.backgroundSoundEnabled) && state.active) {
       startEngineSound();
-      if (state.level >= 4) {
+      if (isWaterLevel()) {
         startWaterSound();
       }
       startBackgroundMusic();

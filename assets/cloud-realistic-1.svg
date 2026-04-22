@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" role="img" aria-label="Cloud layer">
+  <defs>
+    <filter id="cloudBlur1" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <linearGradient id="cloudFill1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#dfefff" stop-opacity="0.88"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#cloudBlur1)">
+    <ellipse cx="156" cy="122" rx="110" ry="42" fill="url(#cloudFill1)"/>
+    <ellipse cx="236" cy="98" rx="86" ry="38" fill="url(#cloudFill1)"/>
+    <ellipse cx="310" cy="124" rx="120" ry="44" fill="url(#cloudFill1)"/>
+    <ellipse cx="402" cy="104" rx="92" ry="36" fill="url(#cloudFill1)"/>
+    <ellipse cx="486" cy="128" rx="96" ry="38" fill="url(#cloudFill1)"/>
+    <ellipse cx="244" cy="142" rx="210" ry="34" fill="#f7fbff" fill-opacity="0.82"/>
+  </g>
+</svg>

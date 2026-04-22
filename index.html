@@ -49,6 +49,7 @@
         <div class="road-line line-2"></div>
         <div class="road-line line-3"></div>
         <div class="road-line line-4"></div>
+        <div id="skyCloudLayer" class="sky-cloud-layer" aria-hidden="true"></div>
 
         <div id="playerCar" class="vehicle player-vehicle car-sport"></div>
         <div id="boostMeter" class="boost-meter hidden" aria-hidden="true">
@@ -167,6 +168,8 @@
                   <button class="admin-level-button" type="button" data-admin-level="3">Level 3</button>
                   <button class="admin-level-button" type="button" data-admin-level="4">Level 4</button>
                   <button class="admin-level-button" type="button" data-admin-level="5">Level 5</button>
+                  <button class="admin-level-button" type="button" data-admin-level="6">Level 6</button>
+                  <button class="admin-level-button" type="button" data-admin-level="7">Final Level</button>
                 </div>
                 <div class="auth-actions compact">
                   <button id="adminPlayButton" class="auth-button primary" type="button">Play Selected Level</button>
@@ -245,6 +248,38 @@
                   <button class="vehicle-option level-four-option is-locked" data-vehicle="jet-stealth" data-level-four-only="true" type="button" disabled>
                     <span class="vehicle-preview jet-preview jet-stealth"></span>
                     <span>Yacht</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="vehicle-group level-six-unlocks-group">
+                <h3>Level 6 Unlocks</h3>
+                <div class="vehicle-grid">
+                  <button class="vehicle-option level-six-option is-locked" data-vehicle="plane-private" data-level-six-only="true" type="button" disabled>
+                    <span class="vehicle-preview plane-preview plane-private"></span>
+                    <span>Private Jet</span>
+                  </button>
+                  <button class="vehicle-option level-six-option is-locked" data-vehicle="plane-golden" data-level-six-only="true" type="button" disabled>
+                    <span class="vehicle-preview plane-preview plane-golden"></span>
+                    <span>Golden Plane</span>
+                  </button>
+                  <button class="vehicle-option level-six-option is-locked" data-vehicle="plane-stealth" data-level-six-only="true" type="button" disabled>
+                    <span class="vehicle-preview plane-preview plane-stealth"></span>
+                    <span>Sky Plane</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="vehicle-group level-seven-unlocks-group">
+                <h3>Final Level Unlocks</h3>
+                <div class="vehicle-grid">
+                  <button class="vehicle-option level-seven-option is-locked" data-vehicle="ufo-metal" data-level-seven-only="true" type="button" disabled>
+                    <span class="vehicle-preview ufo-preview ufo-metal"></span>
+                    <span>Metal UFO</span>
+                  </button>
+                  <button class="vehicle-option level-seven-option is-locked" data-vehicle="ufo-mercury" data-level-seven-only="true" type="button" disabled>
+                    <span class="vehicle-preview ufo-preview ufo-mercury"></span>
+                    <span>Mercury UFO</span>
                   </button>
                 </div>
               </section>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-label="Mercury UFO">
+  <defs>
+    <linearGradient id="ufoMercuryTop" x1="64" y1="40" x2="64" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7ff"/>
+      <stop offset="0.45" stop-color="#f6c4ff"/>
+      <stop offset="1" stop-color="#b85cff"/>
+    </linearGradient>
+    <linearGradient id="ufoMercuryBase" x1="14" y1="118" x2="114" y2="182" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe0ff"/>
+      <stop offset="0.5" stop-color="#ef8dff"/>
+      <stop offset="1" stop-color="#8b33da"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="90" rx="30" ry="34" fill="url(#ufoMercuryTop)" stroke="#35124b" stroke-width="6"/>
+  <ellipse cx="64" cy="138" rx="52" ry="29" fill="url(#ufoMercuryBase)" stroke="#35124b" stroke-width="6"/>
+  <ellipse cx="64" cy="151" rx="42" ry="16" fill="rgba(255,255,255,0.14)"/>
+  <circle cx="36" cy="140" r="6" fill="#ffd8ff"/>
+  <circle cx="64" cy="151" r="7" fill="#ffd8ff"/>
+  <circle cx="92" cy="140" r="6" fill="#ffd8ff"/>
+  <path d="M34 170 24 198" stroke="#ff9dff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M64 177 64 210" stroke="#ff9dff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M94 170 104 198" stroke="#ff9dff" stroke-width="5" stroke-linecap="round"/>
+</svg>

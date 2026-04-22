@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-label="Aeroplane">
+  <defs>
+    <linearGradient id="planeBody" x1="64" y1="16" x2="64" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c8f1ff"/>
+      <stop offset="0.45" stop-color="#7ed3ff"/>
+      <stop offset="1" stop-color="#2f7cff"/>
+    </linearGradient>
+    <linearGradient id="planeWing" x1="14" y1="126" x2="114" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d7f8ff"/>
+      <stop offset="1" stop-color="#67a8ff"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 14 83 40 83 187 64 242 45 187 45 40Z" fill="url(#planeBody)" stroke="#102748" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M64 30c10 0 18 8 18 18v36H46V48c0-10 8-18 18-18Z" fill="#effbff" opacity=".9"/>
+  <path d="M14 122 57 99H71l43 23-43 23H57Z" fill="url(#planeWing)" stroke="#102748" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M30 148 56 137H72l26 11-26 13H56Z" fill="#b7eaff" opacity=".88" stroke="#102748" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M45 62 27 46" fill="none" stroke="#102748" stroke-width="6" stroke-linecap="round"/>
+  <path d="M83 62 101 46" fill="none" stroke="#102748" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 228 82 197H46Z" fill="#0d1c33" opacity=".65"/>
+  <circle cx="64" cy="112" r="8" fill="#ffffff" opacity=".95"/>
+</svg>

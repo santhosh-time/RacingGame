@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-label="Golden Plane">
+  <defs>
+    <linearGradient id="goldBody" x1="64" y1="16" x2="64" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7cf"/>
+      <stop offset="0.45" stop-color="#ffd86b"/>
+      <stop offset="1" stop-color="#ff9f1c"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 16 82 40 83 188 64 241 45 188 46 40Z" fill="url(#goldBody)" stroke="#4c2b00" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M64 29c10 0 18 8 18 18v34H46V47c0-10 8-18 18-18Z" fill="#fff9e6" opacity=".95"/>
+  <path d="M6 124 54 100H74l48 24-48 24H54Z" fill="#ffc95c" stroke="#4c2b00" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M22 156 54 142H74l32 14-32 16H54Z" fill="#ffe39d" opacity=".92" stroke="#4c2b00" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M45 62 27 46" fill="none" stroke="#4c2b00" stroke-width="6" stroke-linecap="round"/>
+  <path d="M83 62 101 46" fill="none" stroke="#4c2b00" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 228 82 198H46Z" fill="#5f3600" opacity=".6"/>
+  <circle cx="64" cy="112" r="8" fill="#ffffff" opacity=".96"/>
+</svg>
