@@ -622,6 +622,28 @@ body.is-playing .game-area {
   z-index: 2;
 }
 
+.boost-meter {
+  position: absolute;
+  width: 54px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(7, 16, 28, 0.78);
+  border: 1px solid rgba(139, 241, 255, 0.38);
+  box-shadow: 0 0 12px rgba(76, 216, 255, 0.22);
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.boost-meter-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7ff6ff 0%, #46b8ff 45%, #135dff 100%);
+  box-shadow: 0 0 12px rgba(79, 221, 255, 0.55);
+  transform-origin: left center;
+}
+
 .barricade {
   position: absolute;
   width: 56px;
@@ -665,36 +687,79 @@ body.is-playing .game-area {
 }
 
 .pickup-booster {
-  border-radius: 50% 50% 65% 65%;
-  background:
-    radial-gradient(circle at 50% 22%, #eef9ff 0 16%, #7be8ff 17% 32%, #1db5ff 33% 58%, #1457d1 59% 100%);
-  filter: drop-shadow(0 0 10px rgba(80, 200, 255, 0.7));
+  width: 56px;
+  height: 84px;
+  background: transparent;
+  filter: none;
 }
 
 .pickup-booster::before {
-  content: "";
-  position: absolute;
-  inset: 6px 10px 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  content: none;
 }
 
 .pickup-booster::after {
-  content: "";
+  content: none;
+}
+
+.pickup-booster span,
+.pickup-laser span {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: -12px;
-  height: 24px;
-  border-radius: 50% 50% 90% 90%;
-  background: linear-gradient(180deg, rgba(130, 230, 255, 0.95), rgba(17, 77, 205, 0));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 62px;
+  line-height: 1;
+  font-weight: 900;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+  animation: pickup-marker-float 1.4s ease-in-out infinite, pickup-marker-spin 2.8s linear infinite;
+}
+
+.pickup-booster span {
+  color: #53bfff;
+  text-shadow:
+    0 0 10px rgba(219, 248, 255, 0.78),
+    0 0 22px rgba(83, 191, 255, 0.95),
+    0 0 34px rgba(24, 102, 255, 0.72);
+  filter:
+    drop-shadow(0 0 10px rgba(116, 233, 255, 0.95))
+    drop-shadow(0 0 20px rgba(41, 145, 255, 0.85));
 }
 
 .pickup-laser {
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, #f8f2ff 0 18%, #ff5fd1 18% 50%, #8628ff 50% 100%);
-  box-shadow: 0 0 14px rgba(196, 106, 255, 0.65);
+  width: 56px;
+  height: 84px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pickup-laser span {
+  color: #ff8cf1;
+  text-shadow:
+    0 0 10px rgba(255, 231, 252, 0.8),
+    0 0 22px rgba(255, 140, 241, 0.95),
+    0 0 34px rgba(186, 54, 255, 0.72);
+  filter:
+    drop-shadow(0 0 10px rgba(255, 156, 236, 0.95))
+    drop-shadow(0 0 20px rgba(201, 68, 255, 0.82));
+}
+
+@keyframes pickup-marker-float {
+  0%, 100% {
+    margin-top: 0;
+  }
+  50% {
+    margin-top: -8px;
+  }
+}
+
+@keyframes pickup-marker-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 .pickup-laser::before,
@@ -706,15 +771,19 @@ body.is-playing .game-area {
 }
 
 .pickup-laser::before {
-  background:
-    linear-gradient(90deg, transparent 0 30%, rgba(255, 255, 255, 0.95) 30% 70%, transparent 70% 100%);
+  content: none;
 }
 
 .pickup-fuel {
   border-radius: 14px;
   background:
     linear-gradient(180deg, #eaffef 0 18%, #53df7a 18% 58%, #1d8f42 58% 100%);
-  box-shadow: 0 0 14px rgba(98, 231, 131, 0.52);
+  box-shadow:
+    0 0 14px rgba(98, 231, 131, 0.72),
+    0 0 28px rgba(32, 190, 92, 0.45);
+  filter:
+    drop-shadow(0 0 10px rgba(133, 248, 166, 0.9))
+    drop-shadow(0 0 18px rgba(39, 170, 82, 0.7));
 }
 
 .pickup-fuel::before {

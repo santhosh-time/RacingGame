@@ -1,5 +1,7 @@
 const gameArea = document.getElementById("gameArea");
 const playerCar = document.getElementById("playerCar");
+const boostMeter = document.getElementById("boostMeter");
+const boostMeterFill = document.getElementById("boostMeterFill");
 const scoreDisplay = document.getElementById("score");
 const bestScoreDisplay = document.getElementById("bestScore");
 const speedDisplay = document.getElementById("speedDisplay");
@@ -87,6 +89,7 @@ const levelFourBaseSpeed = 9.03;
 const levelFourTargetSpeed = 12.5;
 const levelFourEndScore = 35000;
 const levelFiveStartScore = 35000;
+const levelFiveEndScore = 50000;
 const levelOneEndScore = 8000;
 const levelOneTargetKmph = 70;
 const levelOneWarmupDurationMs = 5000;
@@ -342,6 +345,9 @@ function levelEndScore(levelNumber) {
   }
   if (levelNumber === 4) {
     return levelFiveStartScore;
+  }
+  if (levelNumber === 5) {
+    return levelFiveEndScore;
   }
   return 0;
 }
@@ -2528,8 +2534,6 @@ function createScoreCardImage() {
 
   const headerFill = isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
   const panelFill = isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
-  const waveStroke = isWaterCard ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.08)";
-
   ctx.fillStyle = headerFill;
   ctx.fillRect(110, 90, 860, 200);
   ctx.strokeStyle = isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
@@ -2539,23 +2543,25 @@ function createScoreCardImage() {
   ctx.fillStyle = isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
   ctx.fillRect(120, 300, 840, 1320);
 
-  ctx.strokeStyle = waveStroke;
-  ctx.lineWidth = 7;
-  for (let y = 340; y < 1660; y += 120) {
-    ctx.beginPath();
-    ctx.moveTo(110, y);
-    ctx.bezierCurveTo(280, y - 26, 460, y + 18, 650, y - 10);
-    ctx.bezierCurveTo(790, y - 26, 900, y + 12, 980, y - 8);
-    ctx.stroke();
-  }
+  if (isWaterCard) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.lineWidth = 7;
+    for (let y = 340; y < 1660; y += 120) {
+      ctx.beginPath();
+      ctx.moveTo(110, y);
+      ctx.bezierCurveTo(280, y - 26, 460, y + 18, 650, y - 10);
+      ctx.bezierCurveTo(790, y - 26, 900, y + 12, 980, y - 8);
+      ctx.stroke();
+    }
 
-  ctx.fillStyle = isWaterCard ? "rgba(255, 255, 255, 0.09)" : "rgba(255, 255, 255, 0.05)";
-  ctx.beginPath();
-  ctx.ellipse(230, 310, 120, 24, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.09)";
+    ctx.beginPath();
+    ctx.ellipse(230, 310, 120, 24, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");
   drawThreeDText(ctx, "High Score Card", 540, 236, "34px Verdana", "#cfd8dc", "rgba(3, 10, 18, 0.7)", "rgba(255, 255, 255, 0.08)");
@@ -3269,6 +3275,7 @@ function refreshSpeed() {
   const levelOneBoostMultiplier = state.level === 1 && Date.now() < state.boostActiveUntil ? boostMultiplier : 1;
   state.currentSpeed = state.baseSpeed * levelOneBoostMultiplier * laserMultiplier;
   speedDisplay.textContent = `${getCurrentKmph()} km/h`;
+  updateBoostMeter();
   updateLevelDisplay();
   updateLivesDisplay();
   updateFuelDisplay();
@@ -3294,6 +3301,32 @@ function enemyVehicleWidth(vehicleName) {
 function updatePlayerVerticalPosition() {
   playerCar.style.top = "auto";
   playerCar.style.bottom = "18px";
+  updateBoostMeter();
+}
+
+function updateBoostMeter() {
+  if (!boostMeter || !boostMeterFill) {
+    return;
+  }
+
+  const boosterActive = state.level === 1 && Date.now() < state.boostActiveUntil;
+  boostMeter.classList.toggle("hidden", !boosterActive);
+
+  if (!boosterActive) {
+    boostMeterFill.style.transform = "scaleX(0)";
+    return;
+  }
+
+  const remaining = Math.max(0, state.boostActiveUntil - Date.now());
+  const progress = Math.max(0, Math.min(1, remaining / boostDurationMs));
+  const vehicleLeft = parseFloat(playerCar.style.left || `${state.playerX || 0}`);
+  const playerWidth = vehicleWidth();
+  const meterWidth = 54;
+  const centeredLeft = clampVehicleLeft(vehicleLeft + playerWidth / 2 - meterWidth / 2, meterWidth);
+
+  boostMeter.style.left = `${centeredLeft}px`;
+  boostMeter.style.bottom = "116px";
+  boostMeterFill.style.transform = `scaleX(${progress})`;
 }
 
 function barricadeWidth() {
@@ -3507,6 +3540,11 @@ function createPickup(y, pickupType) {
   const pickup = document.createElement("div");
   pickup.className = `pickup pickup-${pickupType}`;
   pickup.dataset.type = pickupType;
+  if (pickupType === "booster" || pickupType === "laser") {
+    const marker = document.createElement("span");
+    marker.textContent = "✦";
+    pickup.appendChild(marker);
+  }
   const left = safeBoosterX();
   pickup.style.top = `${y}px`;
   pickup.style.left = `${left}px`;
@@ -3595,6 +3633,7 @@ function updateBoosterLaneSafety() {
 function addBoostLevel() {
   state.boostLevel = 1;
   state.boostActiveUntil = Date.now() + boostDurationMs;
+  updateBoostMeter();
   refreshSpeed();
   playBoosterSound();
 }
@@ -3997,6 +4036,7 @@ function updatePlayer(deltaFrames = 1) {
 
   state.playerX = clampVehicleLeft(state.playerX, vehicleWidth());
   playerCar.style.left = `${state.playerX}px`;
+  updateBoostMeter();
 }
 
 async function handleVehicleCrash() {
