@@ -92,6 +92,8 @@ const boosterWidth = 38;
 const missileWidth = 14;
 const missileHeight = 30;
 const missileLaunchIntervalMs = 260;
+const bossMissileLaunchIntervalMs = 3000;
+const rescueMissileLaunchIntervalMs = 240;
 const adminSessionKey = "viral-racing-admin";
 const adminAccessCode = "viraladmin";
 const accessWindowHours = 24;
@@ -110,7 +112,11 @@ const levelFourEndScore = 35000;
 const levelFiveStartScore = 35000;
 const levelSixStartScore = 45000;
 const levelFiveEndScore = levelSixStartScore;
+const levelSixBossStartScore = 65000;
+const levelSixRescueStartScore = 69000;
+const levelSixBossDefeatScore = 69800;
 const levelSixEndScore = 70000;
+const finalLevelEndScore = 100000;
 const levelOneEndScore = 8000;
 const levelOneTargetKmph = 70;
 const levelOneWarmupDurationMs = 5000;
@@ -171,6 +177,10 @@ const state = {
   pickup: null,
   pickupType: "",
   missiles: [],
+  bossCraft: null,
+  bossMissiles: [],
+  rescueCraft: null,
+  rescueMissiles: [],
   barricades: [],
   nextLevelScore: 8000,
   levelStartScore: 0,
@@ -186,6 +196,10 @@ const state = {
   levelWarmupUntil: 0,
   laserActiveUntil: 0,
   nextMissileAt: 0,
+  nextBossMissileAt: 0,
+  nextRescueMissileAt: 0,
+  bossDirection: 1,
+  bossDefeated: false,
   invincibleUntil: 0,
   levelFourSelectionOpen: false,
   pointer: {
@@ -204,6 +218,7 @@ const state = {
   pendingDonationOrderId: "",
   adminUnlocked: false,
   adminSelectedLevel: 1,
+  adminCustomScore: "",
   restartLevel: 1,
   restartVehicle: "bike-street",
   passwordRecoveryMode: false,
@@ -223,6 +238,13 @@ const audioState = {
   engineSecondaryOscillator: null,
   engineSecondaryFilter: null,
   engineStarted: false,
+  bossGain: null,
+  bossOscillator: null,
+  bossLowpass: null,
+  bossSecondaryGain: null,
+  bossSecondaryOscillator: null,
+  bossSecondaryFilter: null,
+  bossStarted: false,
   waterNoiseSource: null,
   waterNoiseGain: null,
   waterFilter: null,
@@ -312,6 +334,10 @@ function isWaterLevel(levelNumber = state.level) {
 
 function isSkyLevel(levelNumber = state.level) {
   return levelNumber >= 6;
+}
+
+function isLevelSixBossPhase(levelNumber = state.level, score = state.score) {
+  return levelNumber === 6 && score >= levelSixBossStartScore && score < levelSixEndScore;
 }
 
 function clearSkyClouds() {
@@ -532,7 +558,7 @@ function levelEndScore(levelNumber) {
     return levelSixEndScore;
   }
   if (levelNumber >= 7) {
-    return 0;
+    return finalLevelEndScore;
   }
   return 0;
 }
@@ -593,6 +619,7 @@ function overlayRefs() {
     adminUnlockButton: document.getElementById("adminUnlockButton"),
     adminCloseButton: document.getElementById("adminCloseButton"),
     adminLevelButtons: Array.from(document.querySelectorAll(".admin-level-button")),
+    adminScoreInput: document.getElementById("adminScoreInput"),
     adminPlayButton: document.getElementById("adminPlayButton"),
     adminLockButton: document.getElementById("adminLockButton"),
     adminStatus: document.getElementById("adminStatus"),
@@ -826,6 +853,7 @@ function updateAdminUI() {
     adminLoginSection,
     adminLevelSection,
     adminPasswordInput,
+    adminScoreInput,
     adminLevelButtons,
   } = overlayRefs();
 
@@ -840,11 +868,27 @@ function updateAdminUI() {
     button.classList.toggle("selected", Number(button.dataset.adminLevel) === state.adminSelectedLevel);
   });
 
+  if (adminScoreInput) {
+    adminScoreInput.value = state.adminCustomScore;
+    const range = adminLevelScoreRange(state.adminSelectedLevel);
+    adminScoreInput.min = String(range.min);
+    adminScoreInput.max = String(range.max);
+    adminScoreInput.placeholder = `Enter ${range.min} to ${range.max}`;
+  }
+
   if (!state.adminUnlocked && adminPasswordInput) {
     adminPasswordInput.value = "";
     updateAdminStatus("Admin level jump is for local testing.", false);
   } else {
-    updateAdminStatus(`Admin ready. Level ${state.adminSelectedLevel} is selected.`, true);
+    const range = adminLevelScoreRange(state.adminSelectedLevel);
+    let customScoreText = ` Enter a score from ${range.min} to ${range.max}, or leave it empty for the default.`;
+    if (state.adminCustomScore) {
+      const enteredScore = Number.parseInt(String(state.adminCustomScore).trim(), 10);
+      customScoreText = isAdminScoreValid(state.adminSelectedLevel, enteredScore)
+        ? ` Score ${enteredScore} will be used.`
+        : ` Score must be between ${range.min} and ${range.max}.`;
+    }
+    updateAdminStatus(`Admin ready. ${displayLevelName(state.adminSelectedLevel)} is selected.${customScoreText}`, true);
   }
 }
 
@@ -2291,6 +2335,15 @@ function bindOverlayControls() {
     });
   }
 
+  if (adminScoreInput) {
+    bindElementOnce(adminScoreInput, "AdminScoreInput", "input", () => {
+      state.adminCustomScore = adminScoreInput.value.trim();
+      if (state.adminUnlocked) {
+        updateAdminUI();
+      }
+    });
+  }
+
   if (adminCloseButton) {
     bindElementOnce(adminCloseButton, "AdminCloseClick", "click", closeAdminPanel);
   }
@@ -3527,6 +3580,99 @@ function updateEngineSound() {
   }
 }
 
+async function startBossCraftSound() {
+  if (!state.vehicleSoundEnabled || !isLevelSixBossPhase()) {
+    return;
+  }
+
+  const context = await ensureAudioReady();
+  if (!context || audioState.bossStarted) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  const lowpass = context.createBiquadFilter();
+  const secondaryOscillator = context.createOscillator();
+  const secondaryGain = context.createGain();
+  const secondaryFilter = context.createBiquadFilter();
+
+  oscillator.type = "sawtooth";
+  oscillator.frequency.value = 74;
+  gainNode.gain.value = 0.0001;
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 860;
+  lowpass.Q.value = 1.4;
+
+  secondaryOscillator.type = "triangle";
+  secondaryOscillator.frequency.value = 116;
+  secondaryGain.gain.value = 0.0001;
+  secondaryFilter.type = "bandpass";
+  secondaryFilter.frequency.value = 740;
+  secondaryFilter.Q.value = 1.1;
+
+  oscillator.connect(lowpass);
+  lowpass.connect(gainNode);
+  gainNode.connect(audioState.masterGain);
+  secondaryOscillator.connect(secondaryFilter);
+  secondaryFilter.connect(secondaryGain);
+  secondaryGain.connect(audioState.masterGain);
+  oscillator.start();
+  secondaryOscillator.start();
+
+  audioState.bossOscillator = oscillator;
+  audioState.bossGain = gainNode;
+  audioState.bossLowpass = lowpass;
+  audioState.bossSecondaryOscillator = secondaryOscillator;
+  audioState.bossSecondaryGain = secondaryGain;
+  audioState.bossSecondaryFilter = secondaryFilter;
+  audioState.bossStarted = true;
+}
+
+function stopBossCraftSound() {
+  if (!audioState.bossStarted || !audioState.context) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  if (audioState.bossGain) {
+    audioState.bossGain.gain.cancelScheduledValues(now);
+    audioState.bossGain.gain.setTargetAtTime(0.0001, now, 0.1);
+  }
+  if (audioState.bossSecondaryGain) {
+    audioState.bossSecondaryGain.gain.cancelScheduledValues(now);
+    audioState.bossSecondaryGain.gain.setTargetAtTime(0.0001, now, 0.1);
+  }
+}
+
+function updateBossCraftSound() {
+  if (!audioState.bossStarted || !audioState.context || !audioState.bossOscillator || !audioState.bossGain || !audioState.bossLowpass || !audioState.bossSecondaryOscillator || !audioState.bossSecondaryGain || !audioState.bossSecondaryFilter) {
+    return;
+  }
+
+  const now = audioState.context.currentTime;
+  const bossLeft = parseFloat(state.bossCraft?.style.left || `${gameBounds.width / 2}`);
+  const normalizedX = gameBounds.width ? Math.max(0, Math.min(1, bossLeft / gameBounds.width)) : 0.5;
+  const sweep = Math.sin(Date.now() / 320) * 4.5;
+  const primaryFrequency = 72 + normalizedX * 20 + sweep;
+  const secondaryFrequency = 110 + normalizedX * 28 - sweep * 0.65;
+  const primaryGain = state.active && isLevelSixBossPhase() && state.vehicleSoundEnabled ? 0.28 : 0.0001;
+  const secondaryGain = state.active && isLevelSixBossPhase() && state.vehicleSoundEnabled ? 0.17 : 0.0001;
+
+  audioState.bossOscillator.frequency.cancelScheduledValues(now);
+  audioState.bossOscillator.frequency.linearRampToValueAtTime(primaryFrequency, now + 0.12);
+  audioState.bossSecondaryOscillator.frequency.cancelScheduledValues(now);
+  audioState.bossSecondaryOscillator.frequency.linearRampToValueAtTime(secondaryFrequency, now + 0.12);
+  audioState.bossGain.gain.cancelScheduledValues(now);
+  audioState.bossGain.gain.setTargetAtTime(primaryGain, now, 0.12);
+  audioState.bossSecondaryGain.gain.cancelScheduledValues(now);
+  audioState.bossSecondaryGain.gain.setTargetAtTime(secondaryGain, now, 0.12);
+  audioState.bossLowpass.frequency.cancelScheduledValues(now);
+  audioState.bossLowpass.frequency.linearRampToValueAtTime(820 + normalizedX * 220 + Math.abs(sweep) * 18, now + 0.12);
+  audioState.bossSecondaryFilter.frequency.cancelScheduledValues(now);
+  audioState.bossSecondaryFilter.frequency.linearRampToValueAtTime(680 + normalizedX * 200, now + 0.12);
+}
+
 async function startWaterSound() {
   if (!state.backgroundSoundEnabled || !isWaterLevel()) {
     return;
@@ -3744,6 +3890,28 @@ function playMissileHitSound() {
   }, 45);
 }
 
+function playBossMissileLaunchSound() {
+  playToneSweep({
+    category: "background",
+    type: "sawtooth",
+    startFrequency: 240,
+    endFrequency: 520,
+    duration: 0.2,
+    volume: 0.5,
+  });
+
+  window.setTimeout(() => {
+    playToneSweep({
+      category: "background",
+      type: "triangle",
+      startFrequency: 520,
+      endFrequency: 360,
+      duration: 0.18,
+      volume: 0.34,
+    });
+  }, 70);
+}
+
 function playFinalLevelVoice() {
   if (!state.backgroundSoundEnabled || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
     return Promise.resolve();
@@ -3753,7 +3921,7 @@ function playFinalLevelVoice() {
     const utterance = new SpeechSynthesisUtterance("You have reached Final Level");
     utterance.rate = 0.98;
     utterance.pitch = 1.08;
-    utterance.volume = 1;
+    utterance.volume = 0.22;
 
     const availableVoices = window.speechSynthesis.getVoices();
     const preferredVoice = availableVoices.find((voice) => /en/i.test(voice.lang) && /female|zira|samantha|google/i.test(voice.name))
@@ -4092,6 +4260,10 @@ function chooseBarricadeX(excludedXs = []) {
 
 function resetEnemies() {
   state.enemies.forEach((enemy) => enemy.remove());
+  if (isLevelSixBossPhase()) {
+    state.enemies = [];
+    return;
+  }
   const spawnCount = state.level >= 4 ? 2 : 3;
   const spawnTops = state.level >= 4 ? [-120, -360] : [-160, -360, -560];
   const lanes = [];
@@ -4131,6 +4303,92 @@ function clearMissiles() {
   state.missiles.forEach((missile) => missile.remove());
   state.missiles = [];
   state.nextMissileAt = 0;
+}
+
+function clearRescueMissiles() {
+  state.rescueMissiles.forEach((missile) => missile.remove());
+  state.rescueMissiles = [];
+  state.nextRescueMissileAt = 0;
+}
+
+function showBossBlast(left, top) {
+  const blast = document.createElement("div");
+  blast.className = "boss-blast";
+  blast.style.left = `${left}px`;
+  blast.style.top = `${top}px`;
+  gameArea.appendChild(blast);
+  window.setTimeout(() => blast.remove(), 900);
+}
+
+function clearBossPhase() {
+  if (state.bossCraft) {
+    state.bossCraft.remove();
+    state.bossCraft = null;
+  }
+  state.bossMissiles.forEach((missile) => missile.remove());
+  state.bossMissiles = [];
+  if (state.rescueCraft) {
+    state.rescueCraft.remove();
+    state.rescueCraft = null;
+  }
+  clearRescueMissiles();
+  state.nextBossMissileAt = 0;
+  state.bossDefeated = false;
+  stopBossCraftSound();
+}
+
+function ensureBossPhase() {
+  if (!isLevelSixBossPhase()) {
+    clearBossPhase();
+    return;
+  }
+
+  if (!state.bossCraft && !state.bossDefeated) {
+    const bossCraft = document.createElement("div");
+    bossCraft.className = "boss-spacecraft";
+    bossCraft.style.left = `${Math.round(gameBounds.width / 2 - 66)}px`;
+    bossCraft.style.top = "26px";
+    gameArea.appendChild(bossCraft);
+    state.bossCraft = bossCraft;
+    state.bossDirection = 1;
+    state.nextBossMissileAt = Date.now() + 600;
+  }
+
+  if (!state.bossDefeated) {
+    startBossCraftSound();
+  }
+}
+
+function ensureRescueCraft() {
+  if (state.score < levelSixRescueStartScore) {
+    return;
+  }
+
+  if (!state.rescueCraft) {
+    const rescueCraft = document.createElement("div");
+    rescueCraft.className = "vehicle rescue-ufo ufo-metal";
+    rescueCraft.style.left = `${gameBounds.width + 140}px`;
+    rescueCraft.style.top = `${Math.round(gameBounds.height * 0.48)}px`;
+    gameArea.appendChild(rescueCraft);
+    state.rescueCraft = rescueCraft;
+    state.nextRescueMissileAt = Date.now() + 260;
+  }
+}
+
+function launchRescueMissile() {
+  if (!state.rescueCraft || !state.bossCraft || state.bossDefeated) {
+    return;
+  }
+
+  const missile = document.createElement("div");
+  missile.className = "rescue-missile";
+  const rescueLeft = parseFloat(state.rescueCraft.style.left);
+  const rescueTop = parseFloat(state.rescueCraft.style.top);
+  const rescueWidth = state.rescueCraft.offsetWidth || gameBounds.jetWidth;
+  missile.style.left = `${rescueLeft + rescueWidth / 2 - 6}px`;
+  missile.style.top = `${rescueTop - 8}px`;
+  gameArea.appendChild(missile);
+  state.rescueMissiles.push(missile);
 }
 
 function respawnEnemy(enemy, respawnTop, forcePlayerLane = false) {
@@ -4396,6 +4654,163 @@ function updateMissiles(deltaFrames = 1) {
   }
 }
 
+function launchBossMissile() {
+  if (!state.bossCraft) {
+    return;
+  }
+
+  const bossMissile = document.createElement("div");
+  bossMissile.className = "boss-missile";
+  const bossLeft = parseFloat(state.bossCraft.style.left);
+  const bossWidth = state.bossCraft.offsetWidth || 132;
+  const bossTop = parseFloat(state.bossCraft.style.top);
+  const startX = bossLeft + bossWidth / 2 - 7;
+  const startY = bossTop + (state.bossCraft.offsetHeight || 66) - 6;
+  const targetX = playerCenterX() - 7;
+  const targetY = gameBounds.height - 20;
+  const verticalDistance = Math.max(120, targetY - startY);
+  const horizontalVelocity = (targetX - startX) / (verticalDistance / 5.6);
+
+  bossMissile.style.left = `${startX}px`;
+  bossMissile.style.top = `${startY}px`;
+  bossMissile.dataset.vx = String(horizontalVelocity);
+  gameArea.appendChild(bossMissile);
+  state.bossMissiles.push(bossMissile);
+  playBossMissileLaunchSound();
+}
+
+function updateBossPhase(deltaFrames = 1) {
+  if (!isLevelSixBossPhase()) {
+    clearBossPhase();
+    return;
+  }
+
+  ensureBossPhase();
+  ensureRescueCraft();
+  state.enemies.forEach((enemy) => enemy.remove());
+  state.enemies = [];
+
+  if (state.bossCraft && !state.bossDefeated) {
+    const bossWidth = state.bossCraft.offsetWidth || 132;
+    const maxLeft = Math.max(24, gameBounds.width - bossWidth - 24);
+    let bossLeft = parseFloat(state.bossCraft.style.left);
+    bossLeft += state.bossDirection * 2.4 * deltaFrames;
+    if (bossLeft <= 24) {
+      bossLeft = 24;
+      state.bossDirection = 1;
+    } else if (bossLeft >= maxLeft) {
+      bossLeft = maxLeft;
+      state.bossDirection = -1;
+    }
+    state.bossCraft.style.left = `${bossLeft}px`;
+  }
+
+  if (state.rescueCraft) {
+    const rescueWidth = state.rescueCraft.offsetWidth || 84;
+    const targetLeft = Math.round(gameBounds.width / 2 - rescueWidth / 2);
+    let rescueLeft = parseFloat(state.rescueCraft.style.left);
+    if (rescueLeft > targetLeft) {
+      rescueLeft = Math.max(targetLeft, rescueLeft - 7.6 * deltaFrames);
+      state.rescueCraft.style.left = `${rescueLeft}px`;
+    } else {
+      state.rescueCraft.style.left = `${targetLeft}px`;
+    }
+  }
+
+  if (state.bossDefeated || !state.bossCraft) {
+    stopBossCraftSound();
+  } else {
+    updateBossCraftSound();
+  }
+
+  if (!state.bossDefeated && Date.now() >= state.nextBossMissileAt) {
+    launchBossMissile();
+    state.nextBossMissileAt = Date.now() + bossMissileLaunchIntervalMs;
+  }
+
+  if (!state.bossDefeated && state.rescueCraft && Date.now() >= state.nextRescueMissileAt) {
+    launchRescueMissile();
+    state.nextRescueMissileAt = Date.now() + rescueMissileLaunchIntervalMs;
+  }
+
+  for (let index = state.bossMissiles.length - 1; index >= 0; index -= 1) {
+    const missile = state.bossMissiles[index];
+    const left = parseFloat(missile.style.left);
+    const top = parseFloat(missile.style.top);
+    const horizontalVelocity = parseFloat(missile.dataset.vx || "0");
+    const nextLeft = left + horizontalVelocity * deltaFrames;
+    const nextTop = top + Math.max(4.8, state.currentSpeed * 0.52) * deltaFrames;
+
+    missile.style.left = `${nextLeft}px`;
+    missile.style.top = `${nextTop}px`;
+
+    if (nextTop > gameBounds.height + 28 || nextLeft < -24 || nextLeft > gameBounds.width + 24) {
+      missile.remove();
+      state.bossMissiles.splice(index, 1);
+      continue;
+    }
+
+    if (Date.now() >= state.invincibleUntil && isColliding(playerCar, missile)) {
+      missile.remove();
+      state.bossMissiles.splice(index, 1);
+      handleVehicleCrash();
+      return;
+    }
+  }
+
+  for (let index = state.rescueMissiles.length - 1; index >= 0; index -= 1) {
+    const missile = state.rescueMissiles[index];
+    const left = parseFloat(missile.style.left);
+    const top = parseFloat(missile.style.top);
+    let nextLeft = left;
+    let nextTop = top - 9.2 * deltaFrames;
+
+    if (state.bossCraft && !state.bossDefeated) {
+      const bossLeft = parseFloat(state.bossCraft.style.left);
+      const bossTop = parseFloat(state.bossCraft.style.top);
+      const bossWidth = state.bossCraft.offsetWidth || 132;
+      const bossHeight = state.bossCraft.offsetHeight || 68;
+      const targetX = bossLeft + bossWidth / 2 - 6;
+      const targetY = bossTop + bossHeight * 0.62;
+      const deltaX = targetX - left;
+      const deltaY = targetY - top;
+      const distance = Math.max(1, Math.hypot(deltaX, deltaY));
+      const travel = 11.5 * deltaFrames;
+
+      if (distance <= travel + 8) {
+        missile.remove();
+        state.rescueMissiles.splice(index, 1);
+        continue;
+      }
+
+      nextLeft = left + (deltaX / distance) * travel;
+      nextTop = top + (deltaY / distance) * travel;
+    }
+
+    missile.style.left = `${nextLeft}px`;
+    missile.style.top = `${nextTop}px`;
+
+    if (nextTop < -36 || nextLeft < -28 || nextLeft > gameBounds.width + 28) {
+      missile.remove();
+      state.rescueMissiles.splice(index, 1);
+    }
+  }
+
+  if (!state.bossDefeated && state.score >= levelSixBossDefeatScore && state.bossCraft) {
+    const blastLeft = parseFloat(state.bossCraft.style.left) + (state.bossCraft.offsetWidth || 132) / 2 - 44;
+    const blastTop = parseFloat(state.bossCraft.style.top) + 4;
+    showBossBlast(blastLeft, blastTop);
+    playMissileHitSound();
+    playCrashSound();
+    state.bossCraft.remove();
+    state.bossCraft = null;
+    state.bossMissiles.forEach((missile) => missile.remove());
+    state.bossMissiles = [];
+    state.bossDefeated = true;
+    stopBossCraftSound();
+  }
+}
+
 function increaseFuel(amount) {
   state.fuelPercent = Math.min(100, state.fuelPercent + amount);
   updateFuelDisplay();
@@ -4457,6 +4872,71 @@ async function showCountdownOverlay(title, subtitle = "") {
   syncVehiclePreviewVisibility();
   state.countdownRunning = false;
   syncGameplayChrome();
+}
+
+async function typeStoryMessage(element, text, speedMs = 26) {
+  if (!element) {
+    return;
+  }
+
+  element.textContent = "";
+  for (let index = 0; index < text.length; index += 1) {
+    element.textContent += text[index];
+    await new Promise((resolve) => window.setTimeout(resolve, speedMs));
+  }
+}
+
+async function showFinalLevelStoryDialog() {
+  const activePlane = state.selectedVehicle.startsWith("plane-") ? state.selectedVehicle : "plane-private";
+  message.classList.remove("hidden", "choice-mode", "guest-race-mode", "paused-mode", "game-over");
+  message.classList.add("story-mode");
+  message.innerHTML = `
+    <div class="story-panel">
+      <p class="countdown-eyebrow">Rescue Transmission</p>
+      <h2>Before The Final Level</h2>
+      <div class="story-characters">
+        <div class="story-character">
+          <span class="vehicle-preview plane-preview ${activePlane}"></span>
+          <span>You</span>
+        </div>
+        <div class="story-character">
+          <span class="vehicle-preview ufo-preview ufo-metal"></span>
+          <span>Friend UFO</span>
+        </div>
+      </div>
+      <div class="story-chat">
+        <div class="story-bubble story-bubble-right" id="storyBubbleUfo"></div>
+        <div class="story-bubble story-bubble-left" id="storyBubblePlayer"></div>
+      </div>
+      <button class="auth-button hidden" type="button" id="storyContinueButton">Continue To Final Level</button>
+    </div>
+  `;
+  syncVehiclePreviewVisibility();
+
+  const ufoBubble = message.querySelector("#storyBubbleUfo");
+  const playerBubble = message.querySelector("#storyBubblePlayer");
+  const continueButton = message.querySelector("#storyContinueButton");
+  const ufoText = "Hey human, I am back on Earth to help you. Would you like to join us, explore the universe, and fight the bad aliens together?";
+  const playerTextPlain = "Hey, that is a surprise. You really do seem like our friend. Sure, let us explore the universe together.";
+  const playerText = "Hey, that is a surprise. You really do seem like our friend. Sure, let’s explore the universe together.";
+
+  await new Promise((resolve) => window.setTimeout(resolve, 220));
+  await typeStoryMessage(ufoBubble, ufoText, 22);
+  await new Promise((resolve) => window.setTimeout(resolve, 280));
+  await typeStoryMessage(playerBubble, playerTextPlain, 22);
+  continueButton?.classList.remove("hidden");
+
+  await new Promise((resolve) => {
+    continueButton?.addEventListener("click", () => {
+      playClickSound();
+      continueButton.disabled = true;
+      continueButton.textContent = "Opening Final Level...";
+      resolve();
+    }, { once: true });
+  });
+
+  message.classList.remove("story-mode");
+  syncVehiclePreviewVisibility();
 }
 
 function displayLevelName(levelNumber) {
@@ -4568,6 +5048,7 @@ async function beginLevel(levelNumber, skipCelebration = false) {
   cancelAnimationFrame(state.animationId);
   stopGameOverMusic();
   stopEngineSound();
+  stopBossCraftSound();
   stopWaterSound();
   stopBackgroundMusic();
   syncGameplayChrome();
@@ -4657,9 +5138,11 @@ async function beginLevel(levelNumber, skipCelebration = false) {
   state.levelOneWarmupStartAt = 0;
   state.levelOneWarmupUntil = 0;
   state.nextMissileAt = 0;
+  state.nextBossMissileAt = 0;
 
   clearBarricades();
   clearMissiles();
+  clearBossPhase();
   resetEnemies();
   state.playerX = middleLaneX();
   updatePlayerVerticalPosition();
@@ -4700,6 +5183,41 @@ function adminLevelStartScore(levelNumber) {
   return 0;
 }
 
+function adminLevelScoreRange(levelNumber) {
+  if (levelNumber <= 1) {
+    return { min: 0, max: levelOneEndScore };
+  }
+  if (levelNumber === 2) {
+    return { min: levelOneEndScore, max: levelTwoEndScore };
+  }
+  if (levelNumber === 3) {
+    return { min: levelTwoEndScore, max: levelFourStartScore };
+  }
+  if (levelNumber === 4) {
+    return { min: levelFourStartScore, max: levelFiveStartScore };
+  }
+  if (levelNumber === 5) {
+    return { min: levelFiveStartScore, max: levelSixStartScore };
+  }
+  if (levelNumber === 6) {
+    return { min: levelSixStartScore, max: levelSixEndScore };
+  }
+  return { min: levelSixEndScore, max: finalLevelEndScore };
+}
+
+function isAdminScoreValid(levelNumber, score) {
+  const range = adminLevelScoreRange(levelNumber);
+  return Number.isFinite(score) && score >= range.min && score <= range.max;
+}
+
+function adminLaunchScore(levelNumber) {
+  const enteredScore = Number.parseInt(String(state.adminCustomScore || "").trim(), 10);
+  if (isAdminScoreValid(levelNumber, enteredScore)) {
+    return enteredScore;
+  }
+  return adminLevelStartScore(levelNumber);
+}
+
 async function initializeRun(levelNumber = 1, startScore = 0) {
   cancelAnimationFrame(state.animationId);
   syncGameBounds();
@@ -4727,12 +5245,14 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.levelTwoWarmupUntil = 0;
   state.laserActiveUntil = 0;
   state.nextMissileAt = 0;
+  state.nextBossMissileAt = 0;
   state.invincibleUntil = 0;
   state.reviveRunning = false;
   state.paused = false;
   state.fuelPercent = 100;
   state.pendingTransition = false;
   state.levelFourSelectionOpen = false;
+  stopBossCraftSound();
   state.lastFrameTime = 0;
   state.enemyRespawns = 0;
   state.restartLevel = levelNumber;
@@ -4747,6 +5267,7 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   clearBarricades();
   clearBooster();
   clearMissiles();
+  clearBossPhase();
   state.pickupType = "";
   playerCar.style.left = `${state.playerX}px`;
   scoreDisplay.textContent = String(Math.floor(startScore));
@@ -4776,10 +5297,16 @@ async function startAdminLevel() {
 
   startButton.blur();
   const levelNumber = state.adminSelectedLevel;
-  const startScore = adminLevelStartScore(levelNumber);
+  const enteredScore = Number.parseInt(String(state.adminCustomScore || "").trim(), 10);
+  if (state.adminCustomScore && !isAdminScoreValid(levelNumber, enteredScore)) {
+    const range = adminLevelScoreRange(levelNumber);
+    updateAdminStatus(`Enter a score between ${range.min} and ${range.max} for ${displayLevelName(levelNumber)}.`, false);
+    return;
+  }
+  const startScore = adminLaunchScore(levelNumber);
 
   toggleAdminPanel(false);
-  updateCloudStatus(`Admin jump ready. Launching Level ${levelNumber}.`, true);
+  updateCloudStatus(`Admin jump ready. Launching ${displayLevelName(levelNumber)} at ${startScore} points.`, true);
 
   if (levelNumber >= 4) {
     const selectedBoat = await showLevelFourSelection(levelNumber);
@@ -4836,6 +5363,7 @@ async function handleVehicleCrash() {
     syncGameplayChrome();
     cancelAnimationFrame(state.animationId);
     stopEngineSound();
+    stopBossCraftSound();
     stopBackgroundMusic();
     state.playerX = middleLaneX();
     playerCar.style.left = `${state.playerX}px`;
@@ -4843,6 +5371,7 @@ async function handleVehicleCrash() {
     clearBarricades();
     clearBooster();
     clearMissiles();
+    clearBossPhase();
     state.baseSpeed = 0;
     state.currentSpeed = 0;
     refreshSpeed();
@@ -4917,6 +5446,11 @@ function isColliding(a, b) {
 }
 
 function updateEnemies(deltaFrames = 1) {
+  if (isLevelSixBossPhase()) {
+    state.enemies.forEach((enemy) => enemy.remove());
+    state.enemies = [];
+    return;
+  }
   const laserActive = Date.now() < state.laserActiveUntil;
   for (const enemy of state.enemies) {
     const top = parseFloat(enemy.style.top);
@@ -5038,6 +5572,7 @@ async function gameLoop(frameTime = performance.now()) {
   spawnBooster();
   spawnBarricades();
   updateEnemies(deltaFrames);
+  updateBossPhase(deltaFrames);
   updateMissiles(deltaFrames);
   updateBarricades(deltaFrames);
   updateBooster(deltaFrames);
@@ -5087,9 +5622,12 @@ async function gameLoop(frameTime = performance.now()) {
     state.active = false;
     cancelAnimationFrame(state.animationId);
     stopEngineSound();
+    stopBossCraftSound();
     stopWaterSound();
     clearBooster();
     await playLevelUpSound(7);
+    await showFinalLevelStoryDialog();
+    clearBossPhase();
     const selectedUfo = await showLevelFourSelection(7);
     applyVehicleSelection(selectedUfo || "ufo-metal");
     await beginLevel(7, true);
@@ -5129,6 +5667,7 @@ function endGame(title = "Crash!") {
   state.paused = false;
   cancelAnimationFrame(state.animationId);
   stopEngineSound();
+  stopBossCraftSound();
   stopWaterSound();
   stopBackgroundMusic();
   clearMissiles();
