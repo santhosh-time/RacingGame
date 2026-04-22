@@ -87,6 +87,11 @@ const levelFourBaseSpeed = 9.03;
 const levelFourTargetSpeed = 12.5;
 const levelFourEndScore = 35000;
 const levelFiveStartScore = 35000;
+const levelOneEndScore = 8000;
+const levelOneTargetKmph = 70;
+const levelOneWarmupDurationMs = 5000;
+const levelOneWarmupKmph = 25;
+const boostDurationMs = 5000;
 const laserDurationMs = 5000;
 const laserSpeedMultiplier = 1.5;
 const fuelDrainStep = 10;
@@ -101,6 +106,7 @@ const state = {
   baseSpeedTarget: levelOneBaseSpeed,
   currentSpeed: levelOneBaseSpeed,
   boostLevel: 0,
+  boostActiveUntil: 0,
   selectedVehicle: "bike-street",
   playerX: 0,
   keys: {
@@ -134,6 +140,8 @@ const state = {
   nextBarricadeScore: 9200,
   levelTwoWarmupStartAt: 0,
   levelTwoWarmupUntil: 0,
+  levelOneWarmupStartAt: 0,
+  levelOneWarmupUntil: 0,
   laserActiveUntil: 0,
   invincibleUntil: 0,
   levelFourSelectionOpen: false,
@@ -246,6 +254,13 @@ function getCurrentKmph() {
   const metersPerPixel = visibleRoadLengthMeters / gameBounds.height;
   const metersPerSecond = state.currentSpeed * targetFramesPerSecond * metersPerPixel;
   return Math.round(metersPerSecond * 3.6);
+}
+
+function gameSpeedForKmph(targetKmph) {
+  const trackHeight = Math.max(gameBounds.height || 0, 640);
+  const metersPerPixel = visibleRoadLengthMeters / trackHeight;
+  const pixelsPerSecond = (targetKmph / 3.6) / Math.max(metersPerPixel, 0.0001);
+  return pixelsPerSecond / targetFramesPerSecond;
 }
 
 function getDeltaFrames(frameTime) {
@@ -1725,11 +1740,12 @@ function resetSessionForNewGame() {
   state.bestScore = 0;
   state.bestScoreLevel = 1;
   state.boostLevel = 0;
-  state.baseSpeed = levelOneBaseSpeed;
-  state.baseSpeedTarget = levelOneBaseSpeed;
-  state.currentSpeed = levelOneBaseSpeed;
+  state.boostActiveUntil = 0;
+  state.baseSpeed = 0;
+  state.baseSpeedTarget = 0;
+  state.currentSpeed = 0;
   state.enemyRespawns = 0;
-  state.nextBoosterScore = 1000;
+  state.nextBoosterScore = 2000;
   state.nextLaserScore = 2000;
   state.nextFuelScore = 8700;
   state.nextFuelDrainScore = 9000;
@@ -1737,6 +1753,8 @@ function resetSessionForNewGame() {
   state.levelStartScore = 0;
   state.levelTwoWarmupStartAt = 0;
   state.levelTwoWarmupUntil = 0;
+  state.levelOneWarmupStartAt = 0;
+  state.levelOneWarmupUntil = 0;
   state.laserActiveUntil = 0;
   state.invincibleUntil = 0;
   state.reviveRunning = false;
@@ -3163,7 +3181,7 @@ function vehicleWidth() {
 
 function refreshSpeed() {
   const laserMultiplier = 1;
-  const levelOneBoostMultiplier = state.level === 1 ? boostMultiplier ** state.boostLevel : 1;
+  const levelOneBoostMultiplier = state.level === 1 && Date.now() < state.boostActiveUntil ? boostMultiplier : 1;
   state.currentSpeed = state.baseSpeed * levelOneBoostMultiplier * laserMultiplier;
   speedDisplay.textContent = `${getCurrentKmph()} km/h`;
   updateLevelDisplay();
@@ -3490,13 +3508,33 @@ function updateBoosterLaneSafety() {
 }
 
 function addBoostLevel() {
-  state.boostLevel += 1;
+  state.boostLevel = 1;
+  state.boostActiveUntil = Date.now() + boostDurationMs;
   refreshSpeed();
   playBoosterSound();
 }
 
 function updateSpeedRamp() {
-  if (state.level === 2) {
+  if (state.level === 1) {
+    const now = Date.now();
+    if (state.levelOneWarmupUntil && now < state.levelOneWarmupUntil) {
+      const warmupProgress = Math.max(
+        0,
+        Math.min(1, (now - state.levelOneWarmupStartAt) / levelOneWarmupDurationMs)
+      );
+      state.baseSpeedTarget = gameSpeedForKmph(levelOneWarmupKmph * warmupProgress);
+    } else {
+      if (state.levelOneWarmupUntil) {
+        state.levelOneWarmupUntil = 0;
+        state.baseSpeed = Math.max(state.baseSpeed, gameSpeedForKmph(levelOneWarmupKmph));
+      }
+
+      const scoreSpan = Math.max(1, levelOneEndScore - state.levelStartScore);
+      const progress = Math.max(0, Math.min(1, (state.score - state.levelStartScore) / scoreSpan));
+      const targetKmph = levelOneWarmupKmph + (levelOneTargetKmph - levelOneWarmupKmph) * progress;
+      state.baseSpeedTarget = gameSpeedForKmph(targetKmph);
+    }
+  } else if (state.level === 2) {
     const now = Date.now();
     if (state.levelTwoWarmupUntil && now < state.levelTwoWarmupUntil) {
       const warmupProgress = Math.max(
@@ -3530,7 +3568,7 @@ function updateSpeedRamp() {
     return;
   }
 
-  const rampFactor = state.level === 3 ? 0.012 : 0.03;
+  const rampFactor = state.level === 1 ? 0.05 : state.level === 3 ? 0.012 : 0.03;
   state.baseSpeed += difference * rampFactor;
 }
 
@@ -3686,9 +3724,12 @@ async function beginLevel(levelNumber) {
   applyLevelTheme();
 
   if (levelNumber === 1) {
-    state.baseSpeed = 2.6;
-    state.baseSpeedTarget = levelOneBaseSpeed;
+    state.baseSpeed = 0;
+    state.baseSpeedTarget = 0;
     state.boostLevel = 0;
+    state.boostActiveUntil = 0;
+    state.levelOneWarmupStartAt = Date.now();
+    state.levelOneWarmupUntil = state.levelOneWarmupStartAt + levelOneWarmupDurationMs;
     state.nextBoosterScore = Math.max(2000, state.score + 2000);
     state.nextLaserScore = 1000;
     state.nextFuelScore = 8700;
@@ -3696,11 +3737,14 @@ async function beginLevel(levelNumber) {
     state.nextBarricadeScore = 9200;
     state.fuelPercent = 100;
   } else if (levelNumber === 2) {
+    state.levelOneWarmupStartAt = 0;
+    state.levelOneWarmupUntil = 0;
     state.baseSpeed = 0;
     state.baseSpeedTarget = levelTwoBaseSpeed;
     state.levelTwoWarmupStartAt = Date.now();
     state.levelTwoWarmupUntil = state.levelTwoWarmupStartAt + levelTwoWarmupDurationMs;
     state.boostLevel = 0;
+    state.boostActiveUntil = 0;
     state.nextLaserScore = Math.max(state.score + 1000, 2000);
     state.nextLevelScore = levelTwoEndScore;
     state.nextBarricadeScore = Math.max(state.score + 700, 9200);
@@ -3709,15 +3753,21 @@ async function beginLevel(levelNumber) {
     state.levelTwoWarmupStartAt = 0;
     state.levelTwoWarmupUntil = 0;
     if (levelNumber === 3) {
+      state.levelOneWarmupStartAt = 0;
+      state.levelOneWarmupUntil = 0;
       state.baseSpeed = Math.max(state.baseSpeed, levelThreeStartSpeed);
       state.baseSpeedTarget = levelThreeTargetBaseSpeed;
+      state.boostActiveUntil = 0;
       state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
       state.nextFuelScore = Math.max(state.score + 700, 8700);
       state.nextFuelDrainScore = Math.max(state.score + 1000, 9000);
       state.fuelPercent = 100;
     } else {
+      state.levelOneWarmupStartAt = 0;
+      state.levelOneWarmupUntil = 0;
       state.baseSpeed = levelNumber === 4 ? levelFourBaseSpeed : levelFourTargetSpeed;
       state.baseSpeedTarget = levelFourTargetSpeed;
+      state.boostActiveUntil = 0;
       state.nextLaserScore = Math.max(state.score + 1000, state.nextLaserScore);
       state.nextFuelScore = Math.max(state.score + 700, state.nextFuelScore);
       state.nextFuelDrainScore = Math.max(state.score + 1000, state.nextFuelDrainScore);
@@ -3767,10 +3817,13 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.score = startScore;
   state.level = 1;
   state.livesRemaining = 0;
-  state.baseSpeed = levelOneBaseSpeed;
-  state.baseSpeedTarget = levelOneBaseSpeed;
-  state.currentSpeed = levelOneBaseSpeed;
+  state.baseSpeed = 0;
+  state.baseSpeedTarget = 0;
+  state.currentSpeed = 0;
   state.boostLevel = 0;
+  state.boostActiveUntil = 0;
+  state.levelOneWarmupStartAt = Date.now();
+  state.levelOneWarmupUntil = state.levelOneWarmupStartAt + levelOneWarmupDurationMs;
   state.playerX = middleLaneX();
   state.nextBoosterScore = 2000;
   state.nextLaserScore = 2000;
@@ -4127,7 +4180,7 @@ async function gameLoop(frameTime = performance.now()) {
   handleFuelDrain();
   scoreDisplay.textContent = String(Math.floor(state.score));
 
-  if (state.level === 1 && (getCurrentKmph() >= 85 || state.score >= 8000) && !state.pendingTransition) {
+  if (state.level === 1 && state.score >= 8000 && !state.pendingTransition) {
     beginLevel(2);
     return;
   }
