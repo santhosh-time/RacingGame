@@ -16,6 +16,7 @@ const pauseButton = document.getElementById("pauseButton");
 const message = document.getElementById("message");
 const welcomeModal = document.getElementById("welcomeModal");
 const welcomeStartButton = document.getElementById("welcomeStartButton");
+const welcomeLogo = document.querySelector(".welcome-logo");
 const laserPointer = document.getElementById("laserPointer");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
 const roadLines = Array.from(document.querySelectorAll(".road-line"));
@@ -2507,6 +2508,121 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.setLineDash([]);
 }
 
+function drawScoreCardBrandIcon(ctx, centerX, centerY, size = 140) {
+  const scale = size / 256;
+  ctx.save();
+  ctx.translate(centerX - size / 2, centerY - size / 2);
+  ctx.scale(scale, scale);
+
+  const bgGradient = ctx.createLinearGradient(40, 28, 208, 224);
+  bgGradient.addColorStop(0, "#1B1540");
+  bgGradient.addColorStop(1, "#102A5C");
+
+  const ringGradient = ctx.createLinearGradient(46, 138, 211, 138);
+  ringGradient.addColorStop(0, "#6FFFE9");
+  ringGradient.addColorStop(1, "#79F25E");
+
+  const headGradient = ctx.createLinearGradient(84, 66, 175, 183);
+  headGradient.addColorStop(0, "#8EDBFF");
+  headGradient.addColorStop(1, "#3B82F6");
+
+  ctx.fillStyle = bgGradient;
+  ctx.beginPath();
+  ctx.arc(128, 128, 98, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(128, 154);
+  ctx.rotate((-12 * Math.PI) / 180);
+  ctx.strokeStyle = ringGradient;
+  ctx.lineWidth = 14;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 82, 23, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.strokeStyle = "#8EDBFF";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(102, 71);
+  ctx.lineTo(89, 49);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(154, 71);
+  ctx.lineTo(167, 49);
+  ctx.stroke();
+
+  ctx.fillStyle = "#FF6B8A";
+  ctx.beginPath();
+  ctx.arc(87, 46, 11, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFB84D";
+  ctx.beginPath();
+  ctx.arc(169, 46, 11, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = headGradient;
+  ctx.strokeStyle = "#132445";
+  ctx.lineWidth = 8;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(128, 62);
+  ctx.bezierCurveTo(94, 62, 66, 87, 66, 118);
+  ctx.bezierCurveTo(66, 142, 82, 163, 105, 171);
+  ctx.lineTo(102, 190);
+  ctx.lineTo(121, 179);
+  ctx.bezierCurveTo(123, 179, 125, 180, 128, 180);
+  ctx.bezierCurveTo(162, 180, 190, 155, 190, 124);
+  ctx.bezierCurveTo(190, 87, 162, 62, 128, 62);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#132445";
+  ctx.beginPath();
+  ctx.ellipse(105, 118, 15, 23, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(151, 118, 15, 23, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.arc(110, 110, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(156, 110, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#132445";
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(108, 145);
+  ctx.quadraticCurveTo(128, 157, 148, 145);
+  ctx.stroke();
+
+  ctx.fillStyle = "#FF6B8A";
+  ctx.beginPath();
+  ctx.arc(59, 89, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#6FFFE9";
+  ctx.beginPath();
+  ctx.arc(194, 187, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#FFD45A";
+  ctx.beginPath();
+  ctx.arc(205, 88, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function createScoreCardImage() {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -2565,6 +2681,7 @@ function createScoreCardImage() {
 
   drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");
   drawThreeDText(ctx, "High Score Card", 540, 236, "34px Verdana", "#cfd8dc", "rgba(3, 10, 18, 0.7)", "rgba(255, 255, 255, 0.08)");
+  drawScoreCardBrandIcon(ctx, 540, 84, 110);
 
   ctx.fillStyle = panelFill;
   ctx.fillRect(160, 390, 760, 190);
@@ -2586,29 +2703,16 @@ function createScoreCardImage() {
   return canvas;
 }
 
-function canvasToBlob(canvas) {
-  return new Promise((resolve) => {
-    canvas.toBlob(resolve, "image/png");
-  });
-}
-
-async function saveScoreCard() {
+function saveScoreCard() {
   const filename = `${state.racerName.replace(/\s+/g, "-").toLowerCase()}-high-score.png`;
   const canvas = createScoreCardImage();
-  const blob = await canvasToBlob(canvas);
-  if (!blob) {
-    return;
-  }
-  const objectUrl = URL.createObjectURL(blob);
-
   const link = document.createElement("a");
-  link.href = objectUrl;
+  link.href = canvas.toDataURL("image/png");
   link.download = filename;
   link.rel = "noopener";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 function updateSoundButtons() {
