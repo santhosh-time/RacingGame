@@ -99,6 +99,8 @@ const bossMissileLaunchIntervalMs = 3000;
 const rescueMissileLaunchIntervalMs = 240;
 const adminSessionKey = "viral-racing-admin";
 const adminAccessCode = "viraladmin";
+const donationUpiId = "santhosh411kn@oksbi";
+const donationUpiPayeeName = "Santhosh";
 const accessWindowHours = 24;
 const maxAccessHours = 48;
 const levelOneBaseSpeed = 4.8;
@@ -616,6 +618,7 @@ function overlayRefs() {
     supportPanel: document.getElementById("supportPanel"),
     supportDonationAmountInput: document.getElementById("supportDonationAmountInput"),
     supportDonationButton: document.getElementById("supportDonationButton"),
+    supportUpiButton: document.getElementById("supportUpiButton"),
     profileNameInput: document.getElementById("profileNameInput"),
     saveProfileButton: document.getElementById("saveProfileButton"),
     signOutButton: document.getElementById("signOutButton"),
@@ -1054,6 +1057,23 @@ function formatDonationError(error) {
   }
 
   return "We could not complete the donation right now. Try again in a moment.";
+}
+
+function buildUpiDonationLink({ amountRupees, donorName = "" } = {}) {
+  const params = new URLSearchParams({
+    pa: donationUpiId,
+    pn: donationUpiPayeeName,
+    cu: "INR",
+    tn: donorName
+      ? `Donation from ${donorName} - The Viral Alien`
+      : "Support donation - The Viral Alien",
+  });
+
+  if (Number.isFinite(amountRupees) && amountRupees >= 1) {
+    params.set("am", String(amountRupees));
+  }
+
+  return `upi://pay?${params.toString()}`;
 }
 
 async function readFunctionErrorMessage(error, fallbackMessage) {
@@ -2168,6 +2188,7 @@ function bindOverlayControls() {
     guestRaceStartButton,
     guestRaceBackButton,
     supportDonationButton,
+    supportUpiButton,
     signOutButton,
     deleteProfileButton,
     feedbackToggleButton,
@@ -2308,6 +2329,10 @@ function bindOverlayControls() {
 
   if (supportDonationButton) {
     bindElementOnce(supportDonationButton, "SupportDonateClick", "click", () => openDonationCheckout({ signedIn: true }));
+  }
+
+  if (supportUpiButton) {
+    bindElementOnce(supportUpiButton, "SupportUpiClick", "click", () => openUpiDonationLink({ signedIn: true }));
   }
 
   if (deleteProfileButton) {
@@ -3741,6 +3766,42 @@ function stopEngineSound() {
     audioState.engineSecondaryGain.gain.cancelScheduledValues(now);
     audioState.engineSecondaryGain.gain.setTargetAtTime(0.0001, now, 0.08);
   }
+}
+
+function openUpiDonationLink(options = {}) {
+  const {
+    guestDonationAmountInput,
+    supportDonationAmountInput,
+    authRacerNameInput,
+  } = overlayRefs();
+  const isSignedInSupport = Boolean(options.signedIn);
+  const donationAmountInput = options.amountInputOverride
+    || (isSignedInSupport ? supportDonationAmountInput : guestDonationAmountInput);
+  const updateDonationStatus = (messageText, isReady = false) => {
+    if (options.statusTarget === "cloud" || isSignedInSupport) {
+      updateCloudStatus(messageText, isReady);
+    } else {
+      updateAuthStatus(messageText, isReady);
+    }
+  };
+
+  const amountRupees = Number(donationAmountInput?.value || 0);
+  const donorName = isSignedInSupport
+    ? (state.racerName || "Road Rider")
+    : (authRacerNameInput?.value?.trim() || state.racerName || "Guest Racer");
+
+  if (!Number.isFinite(amountRupees) || amountRupees < 1) {
+    updateDonationStatus("Enter a donation amount of at least Rs.1.", false);
+    return;
+  }
+
+  const upiLink = buildUpiDonationLink({
+    amountRupees,
+    donorName,
+  });
+
+  updateDonationStatus(`Opening your UPI app for Rs.${amountRupees}...`, true);
+  window.location.href = upiLink;
 }
 
 function updateEngineSound() {
@@ -5973,7 +6034,10 @@ function endGame(title = "Crash!") {
             <span>Donation Amount (Rs.)</span>
             <input id="gameOverDonationAmountInput" type="number" min="1" step="1" value="11" placeholder="Enter amount">
           </label>
-          <button id="gameOverDonationButton" class="auth-button primary" type="button">Donate</button>
+          <div class="donation-button-row">
+            <button id="gameOverDonationButton" class="auth-button primary" type="button">Donate</button>
+            <button id="gameOverUpiButton" class="auth-button secondary" type="button">Pay via UPI</button>
+          </div>
         </div>
       </div>
       <p>Start a fresh run and choose your vehicle again whenever you are ready.</p>
@@ -5992,6 +6056,14 @@ function endGame(title = "Crash!") {
       amountInputOverride: donationInput,
       statusTarget: "cloud",
       buttonOverride: document.getElementById("gameOverDonationButton"),
+    });
+  });
+  document.getElementById("gameOverUpiButton").addEventListener("click", () => {
+    const donationInput = document.getElementById("gameOverDonationAmountInput");
+    openUpiDonationLink({
+      signedIn: Boolean(state.user),
+      amountInputOverride: donationInput,
+      statusTarget: "cloud",
     });
   });
 }
