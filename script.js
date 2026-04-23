@@ -5219,6 +5219,7 @@ function showLevelFourSelection(targetLevel = 4) {
   const showUfoOnly = targetLevel >= 7;
   const showPlaneOnly = targetLevel >= 6;
   const headingLabel = targetLevel >= 4 ? displayLevelName(targetLevel) : "Level 4";
+  message.classList.add("level-four-mode");
   message.innerHTML = `
     <div class="level-four-panel">
       <p class="countdown-eyebrow">Congratulations</p>
@@ -5304,6 +5305,7 @@ function showLevelFourSelection(targetLevel = 4) {
     options.forEach((option) => {
       option.addEventListener("click", () => {
         state.levelFourSelectionOpen = false;
+        message.classList.remove("level-four-mode");
         resolve(option.dataset.jet);
       }, { once: true });
     });
@@ -5881,7 +5883,15 @@ async function gameLoop(frameTime = performance.now()) {
     return;
   }
 
-  if (state.level === 5 && state.score >= levelSixStartScore && !state.pendingTransition) {
+  if (state.level === 5 && state.score >= levelSixStartScore && !state.pendingTransition && !state.levelFourSelectionOpen) {
+    state.pendingTransition = true;
+    state.active = false;
+    cancelAnimationFrame(state.animationId);
+    stopEngineSound();
+    stopWaterSound();
+    clearBooster();
+    const selectedPlane = await showLevelFourSelection(6);
+    applyVehicleSelection(selectedPlane || "plane-private");
     await beginLevel(6);
     return;
   }
@@ -6193,6 +6203,11 @@ document.addEventListener("gesturestart", (event) => {
 
 document.addEventListener("touchmove", (event) => {
   if (event.touches.length > 1) {
+    event.preventDefault();
+    return;
+  }
+
+  if ((state.active || state.paused || state.countdownRunning || state.pendingTransition || state.reviveRunning) && event.target.closest(".game-area, .touch-controls, .hud")) {
     event.preventDefault();
   }
 }, { passive: false });
