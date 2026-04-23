@@ -2664,7 +2664,56 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
 function drawScoreCardBackground(ctx, levelNumber, width, height) {
   ctx.clearRect(0, 0, width, height);
 
-  if (levelNumber >= 6) {
+  if (levelNumber >= 7) {
+    const spaceGradient = ctx.createLinearGradient(0, 0, 0, height);
+    spaceGradient.addColorStop(0, "#040814");
+    spaceGradient.addColorStop(0.34, "#081126");
+    spaceGradient.addColorStop(0.66, "#0a1433");
+    spaceGradient.addColorStop(1, "#030711");
+    ctx.fillStyle = spaceGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    const stars = [
+      [90, 120, 2.8, 0.96], [180, 260, 1.8, 0.86], [310, 184, 2.2, 0.9], [420, 340, 1.6, 0.82],
+      [560, 130, 2.6, 0.94], [700, 220, 1.9, 0.84], [840, 140, 2.2, 0.88], [960, 280, 1.7, 0.82],
+      [140, 540, 2.4, 0.9], [280, 680, 1.7, 0.8], [470, 600, 2.8, 0.96], [640, 760, 1.8, 0.82],
+      [820, 620, 2.4, 0.9], [950, 820, 1.9, 0.84], [210, 980, 2.3, 0.9], [390, 1120, 1.8, 0.82],
+      [600, 980, 2.5, 0.94], [780, 1180, 1.8, 0.8], [930, 1040, 2.1, 0.86], [160, 1420, 2.2, 0.88],
+      [360, 1540, 1.8, 0.82], [540, 1360, 2.6, 0.92], [760, 1600, 1.9, 0.84], [920, 1460, 2.2, 0.86],
+    ];
+    stars.forEach(([x, y, r, alpha]) => {
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const galaxyGlow = ctx.createRadialGradient(820, 310, 40, 820, 310, 260);
+    galaxyGlow.addColorStop(0, "rgba(148, 113, 255, 0.34)");
+    galaxyGlow.addColorStop(0.48, "rgba(67, 132, 255, 0.18)");
+    galaxyGlow.addColorStop(1, "rgba(67, 132, 255, 0)");
+    ctx.fillStyle = galaxyGlow;
+    ctx.beginPath();
+    ctx.arc(820, 310, 260, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(130, 177, 255, 0.2)";
+    ctx.beginPath();
+    ctx.arc(180, 240, 88, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 208, 128, 0.16)";
+    ctx.beginPath();
+    ctx.arc(920, 1180, 116, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 224, 156, 0.14)";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.ellipse(920, 1180, 160, 44, -0.24, 0, Math.PI * 2);
+    ctx.stroke();
+    return;
+  }
+
+  if (levelNumber === 6) {
     const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
     skyGradient.addColorStop(0, "#7ed4ff");
     skyGradient.addColorStop(0.34, "#58bdf6");
@@ -2951,6 +3000,7 @@ function createScoreCardImage() {
   const scoreCardBackgroundLevel = Math.max(1, Number(state.level) || 1);
   const isWaterCard = isWaterLevel(scoreCardBackgroundLevel);
   const isSkyCard = isSkyLevel(scoreCardBackgroundLevel);
+  const isFinalCard = scoreCardBackgroundLevel >= 7;
   const scoreCardVehicle = useCurrentRunDetails
     ? state.selectedVehicle
     : (state.bestScoreVehicle || state.selectedVehicle);
@@ -2960,21 +3010,21 @@ function createScoreCardImage() {
 
   drawScoreCardBackground(ctx, scoreCardBackgroundLevel, canvas.width, canvas.height);
 
-  ctx.fillStyle = isSkyCard ? "rgba(18, 74, 120, 0.2)" : isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.46)";
+  ctx.fillStyle = isFinalCard ? "rgba(9, 15, 34, 0.36)" : isSkyCard ? "rgba(18, 74, 120, 0.2)" : isWaterCard ? "rgba(7, 64, 96, 0.22)" : "rgba(7, 17, 28, 0.46)";
   ctx.fillRect(40, 40, 1000, 1840);
-  ctx.strokeStyle = isSkyCard ? "rgba(230, 248, 255, 0.34)" : isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
+  ctx.strokeStyle = isFinalCard ? "rgba(186, 205, 255, 0.34)" : isSkyCard ? "rgba(230, 248, 255, 0.34)" : isWaterCard ? "rgba(183, 228, 255, 0.32)" : "rgba(115, 239, 255, 0.34)";
   ctx.lineWidth = 8;
   ctx.strokeRect(40, 40, 1000, 1840);
 
-  const headerFill = isSkyCard ? "rgba(40, 118, 176, 0.2)" : isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
-  const panelFill = isSkyCard ? "rgba(17, 65, 104, 0.46)" : isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
+  const headerFill = isFinalCard ? "rgba(26, 38, 74, 0.28)" : isSkyCard ? "rgba(40, 118, 176, 0.2)" : isWaterCard ? "rgba(8, 92, 138, 0.18)" : "rgba(8, 18, 28, 0.48)";
+  const panelFill = isFinalCard ? "rgba(16, 24, 52, 0.54)" : isSkyCard ? "rgba(17, 65, 104, 0.46)" : isWaterCard ? "rgba(8, 52, 79, 0.52)" : "rgba(8, 18, 28, 0.52)";
   ctx.fillStyle = headerFill;
   ctx.fillRect(110, 90, 860, 200);
-  ctx.strokeStyle = isSkyCard ? "rgba(240, 250, 255, 0.28)" : isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
+  ctx.strokeStyle = isFinalCard ? "rgba(214, 225, 255, 0.3)" : isSkyCard ? "rgba(240, 250, 255, 0.28)" : isWaterCard ? "rgba(222, 246, 255, 0.28)" : "rgba(115, 239, 255, 0.32)";
   ctx.lineWidth = 5;
   ctx.strokeRect(110, 90, 860, 200);
 
-  ctx.fillStyle = isSkyCard ? "rgba(255, 255, 255, 0.08)" : isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
+  ctx.fillStyle = isFinalCard ? "rgba(255, 255, 255, 0.04)" : isSkyCard ? "rgba(255, 255, 255, 0.08)" : isWaterCard ? "rgba(10, 108, 163, 0.08)" : "rgba(6, 14, 24, 0.14)";
   ctx.fillRect(120, 300, 840, 1320);
 
   if (isWaterCard) {
@@ -2995,6 +3045,16 @@ function createScoreCardImage() {
     ctx.beginPath();
     ctx.ellipse(820, 360, 150, 28, 0, 0, Math.PI * 2);
     ctx.fill();
+  } else if (isFinalCard) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+    ctx.beginPath();
+    ctx.arc(876, 320, 84, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(186, 205, 255, 0.18)";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(876, 320, 120, 32, -0.18, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   drawThreeDText(ctx, "Viral Racing Game", 540, 178, "bold 78px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.85)", "rgba(115, 239, 255, 0.22)");

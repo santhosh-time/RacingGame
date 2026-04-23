@@ -2103,26 +2103,39 @@ body.is-playing .game-area {
   width: 100%;
   display: grid;
   justify-items: center;
-  margin-top: 8px;
+  margin-top: 18px;
+  padding-top: 10px;
 }
 
 .admin-icon-button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(247, 255, 247, 0.82);
-  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(247, 255, 247, 0.38);
+  font-size: 0.68rem;
   font-weight: 800;
   cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.admin-icon-button:hover,
+.admin-icon-button:focus-visible {
+  opacity: 0.72;
+  color: rgba(247, 255, 247, 0.68);
+  border-color: rgba(115, 239, 255, 0.28);
+  transform: translateY(-1px);
 }
 
 .admin-panel {
-  width: 100%;
+  width: min(100%, 360px);
   display: grid;
   gap: 12px;
   margin-top: 10px;
+  margin-inline: auto;
+  justify-items: center;
   padding: 14px;
   border-radius: 16px;
   border: 1px solid rgba(115, 239, 255, 0.18);
@@ -2146,16 +2159,20 @@ body.is-playing .game-area {
 .admin-level-section {
   display: grid;
   gap: 12px;
+  width: 100%;
+  justify-items: center;
 }
 
 .admin-level-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 320px);
+  grid-template-columns: repeat(2, minmax(0, 148px));
   gap: 10px;
+  justify-content: center;
 }
 
 .admin-level-button {
-  min-height: 44px;
+  min-height: 40px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
@@ -2163,12 +2180,33 @@ body.is-playing .game-area {
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
+  width: 148px;
+  justify-self: center;
 }
 
 .admin-level-button.selected {
   border-color: rgba(115, 239, 255, 0.88);
   box-shadow: 0 0 0 2px rgba(115, 239, 255, 0.18);
   background: rgba(115, 239, 255, 0.12);
+}
+
+.admin-panel .field {
+  width: min(100%, 320px);
+  margin-inline: auto;
+}
+
+.admin-panel .field input {
+  text-align: center;
+}
+
+.admin-panel .auth-actions.compact {
+  width: min(100%, 320px);
+  margin-inline: auto;
+  justify-content: center;
+}
+
+.admin-panel .auth-button {
+  min-width: 150px;
 }
 
 .feedback-intro {
