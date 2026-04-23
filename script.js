@@ -3202,7 +3202,7 @@ function createScoreCardImage() {
   drawVehicleBadge(ctx, scoreCardVehicle);
 
   drawFittedCenteredThreeDText(ctx, prettifyVehicleName(scoreCardVehicle), 540, 1530, 520, 58, 34, "#f7fff7", "rgba(3, 10, 18, 0.72)", "rgba(255, 255, 255, 0.08)");
-  drawThreeDText(ctx, `Level ${scoreCardLevel}`, 540, 1688, "bold 64px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.75)", "rgba(255, 255, 255, 0.08)");
+  drawThreeDText(ctx, scoreCardLevel >= 7 ? "Final Level" : `Level ${scoreCardLevel}`, 540, 1688, "bold 64px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.75)", "rgba(255, 255, 255, 0.08)");
 
   return canvas;
 }
