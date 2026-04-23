@@ -28,14 +28,26 @@ body {
     linear-gradient(180deg, #8fd6ff 0%, #bde9ff 36%, #e9f8ff 100%);
 }
 
+body.level-1 {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.34), transparent 16%),
+    radial-gradient(circle at 82% 16%, rgba(255, 232, 163, 0.24), transparent 18%),
+    radial-gradient(circle at 50% 82%, rgba(82, 176, 92, 0.16), transparent 22%),
+    linear-gradient(180deg, #8fd6ff 0%, #bde9ff 36%, #e9f8ff 100%);
+}
+
 body.level-2 {
   background:
+    radial-gradient(circle at 16% 20%, rgba(255, 221, 176, 0.16), transparent 20%),
+    radial-gradient(circle at 82% 74%, rgba(120, 82, 52, 0.18), transparent 24%),
     radial-gradient(circle at top, rgba(191, 132, 77, 0.18), transparent 30%),
     linear-gradient(180deg, #3e2d22, #1f1814);
 }
 
 body.level-3 {
   background:
+    radial-gradient(circle at 18% 18%, rgba(166, 212, 255, 0.18), transparent 18%),
+    radial-gradient(circle at 78% 20%, rgba(255, 202, 120, 0.12), transparent 18%),
     linear-gradient(180deg, rgba(84, 158, 255, 0.28), transparent 24%),
     radial-gradient(circle at 18% 84%, rgba(78, 179, 98, 0.24), transparent 22%),
     radial-gradient(circle at 82% 86%, rgba(78, 179, 98, 0.2), transparent 22%),
@@ -271,6 +283,12 @@ body:not(.is-playing) .hud-actions .start-button {
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.35);
 }
 
+.game-area.level-1 {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    linear-gradient(90deg, #3d3d3d 0 25%, #464646 25% 50%, #505050 50% 75%, #3f3f3f 75% 100%);
+}
+
 body.is-playing .game-area {
   width: 100vw;
   max-width: none;
@@ -282,6 +300,7 @@ body.is-playing .game-area {
 
 .game-area.level-2 {
   background:
+    linear-gradient(180deg, rgba(255, 240, 220, 0.05), rgba(0, 0, 0, 0.04)),
     linear-gradient(90deg, #4f3a2d 0 25%, #5b4333 25% 50%, #684d3b 50% 75%, #4c362a 75% 100%);
   border-left-color: #cdb69f;
   border-right-color: #cdb69f;
@@ -314,7 +333,10 @@ body.is-playing .game-area {
 }
 
 .game-area.level-6 {
-  background: linear-gradient(180deg, #8edbff 0%, #58b8ef 100%);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.18), transparent 20%),
+    radial-gradient(circle at 76% 18%, rgba(255, 255, 255, 0.14), transparent 18%),
+    linear-gradient(180deg, #8edbff 0%, #58b8ef 100%);
   border-left-color: rgba(226, 247, 255, 0.98);
   border-right-color: rgba(226, 247, 255, 0.98);
 }
@@ -348,7 +370,13 @@ body.is-playing .game-area {
 .game-area.level-4::before,
 .game-area.level-4::after,
 .game-area.level-5::before,
-.game-area.level-5::after {
+.game-area.level-5::after,
+.game-area.level-1::before,
+.game-area.level-1::after,
+.game-area.level-2::before,
+.game-area.level-2::after,
+.game-area.level-3::before,
+.game-area.level-3::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -372,6 +400,54 @@ body.is-playing .game-area {
 .game-area.level-5::before {
   opacity: 0.75;
   filter: brightness(0.82);
+}
+
+.game-area.level-1::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 24%),
+    radial-gradient(120% 46% at 50% -10%, rgba(255, 246, 210, 0.34), rgba(255, 246, 210, 0) 58%),
+    linear-gradient(180deg, rgba(118, 186, 238, 0.08), rgba(0, 0, 0, 0.06) 100%);
+  opacity: 0.9;
+}
+
+.game-area.level-1::after {
+  background:
+    radial-gradient(140% 30% at 10% 88%, rgba(94, 196, 90, 0.2) 0 18%, transparent 19%),
+    radial-gradient(140% 28% at 88% 86%, rgba(94, 196, 90, 0.18) 0 18%, transparent 19%);
+  opacity: 0.28;
+  animation: none;
+}
+
+.game-area.level-2::before {
+  background:
+    linear-gradient(180deg, rgba(255, 231, 205, 0.08), rgba(255, 231, 205, 0) 22%),
+    radial-gradient(160% 48% at 50% -12%, rgba(188, 140, 94, 0.22), rgba(188, 140, 94, 0) 56%),
+    radial-gradient(140% 22% at 14% 86%, rgba(121, 82, 56, 0.24) 0 18%, transparent 19%),
+    radial-gradient(140% 22% at 86% 84%, rgba(121, 82, 56, 0.22) 0 18%, transparent 19%);
+  opacity: 0.84;
+}
+
+.game-area.level-2::after {
+  content: none;
+}
+
+.game-area.level-3::before {
+  background:
+    linear-gradient(180deg, rgba(163, 208, 255, 0.16), rgba(163, 208, 255, 0) 24%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(5, 10, 18, 0.16) 100%),
+    radial-gradient(130% 42% at 50% -12%, rgba(133, 188, 255, 0.18), rgba(133, 188, 255, 0) 58%);
+  opacity: 0.9;
+}
+
+.game-area.level-3::after {
+  background:
+    linear-gradient(180deg, transparent 0 54%, rgba(8, 13, 22, 0.22) 54% 100%),
+    radial-gradient(28% 16% at 12% 82%, rgba(92, 150, 226, 0.18) 0 46%, transparent 47%),
+    radial-gradient(30% 18% at 34% 80%, rgba(255, 196, 96, 0.12) 0 26%, transparent 27%),
+    radial-gradient(26% 16% at 58% 84%, rgba(92, 150, 226, 0.16) 0 46%, transparent 47%),
+    radial-gradient(24% 14% at 82% 82%, rgba(255, 196, 96, 0.12) 0 24%, transparent 25%);
+  opacity: 0.36;
+  animation: none;
 }
 
 .game-area.level-4::after,
@@ -552,6 +628,42 @@ body.is-playing .game-area {
   }
 }
 
+@keyframes roadDepthFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 0.52;
+  }
+}
+
+@keyframes mudDepthFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.28;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 0.4;
+  }
+}
+
+@keyframes cityDepthGlow {
+  0%,
+  100% {
+    opacity: 0.4;
+    filter: brightness(0.94);
+  }
+  50% {
+    opacity: 0.56;
+    filter: brightness(1.08);
+  }
+}
+
 @keyframes finalStarTwinkleFar {
   0% {
     opacity: 0.68;
@@ -699,10 +811,10 @@ body.is-playing .game-area {
   opacity: 0.95;
 }
 
-.line-1 { top: 20px; }
+.line-1 { top: 24px; }
 .line-2 { top: 180px; }
-.line-3 { top: 340px; }
-.line-4 { top: 500px; }
+.line-3 { top: 336px; }
+.line-4 { top: 492px; }
 
 .vehicle {
   position: absolute;

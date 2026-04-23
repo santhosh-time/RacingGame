@@ -20,7 +20,7 @@ const welcomeLogo = document.querySelector(".welcome-logo");
 const skyCloudLayer = document.getElementById("skyCloudLayer");
 const laserPointer = document.getElementById("laserPointer");
 const touchHoldButtons = Array.from(document.querySelectorAll("[data-touch-control]"));
-const roadLines = Array.from(document.querySelectorAll(".road-line"));
+let roadLines = Array.from(document.querySelectorAll(".road-line"));
 const initialMessageMarkup = message.innerHTML;
 const initialPageUrl = window.location.href;
 const supabaseProjectUrl = "https://tvmvkjoubttuqnlkdciv.supabase.co";
@@ -40,6 +40,9 @@ const gameBounds = {
 };
 
 const laneCount = 5;
+const roadLineStartTop = 24;
+const roadLineSpacing = 156;
+const roadLineHeight = 80;
 const boostMultiplier = 1.5;
 const vehicleClasses = [
   "bike-street",
@@ -118,6 +121,18 @@ const levelSixBossDefeatScore = 69800;
 const levelSixEndScore = 70000;
 const finalLevelEndScore = 100000;
 const levelOneEndScore = 8000;
+
+function ensureRoadLines(requiredCount = 7) {
+  const insertBeforeNode = skyCloudLayer || playerCar;
+  while (roadLines.length < requiredCount) {
+    const line = document.createElement("div");
+    line.className = "road-line";
+    gameArea.insertBefore(line, insertBeforeNode);
+    roadLines.push(line);
+  }
+}
+
+ensureRoadLines();
 const levelOneTargetKmph = 70;
 const levelOneWarmupDurationMs = 5000;
 const levelOneWarmupKmph = 25;
@@ -222,6 +237,7 @@ const state = {
   adminCustomScore: "",
   restartLevel: 1,
   restartVehicle: "bike-street",
+  roadLineOffset: 0,
   passwordRecoveryMode: false,
   authView: "choice",
   guestReadyVehicle: "",
@@ -2120,10 +2136,8 @@ function resetSessionForNewGame() {
   resetEnemies();
   clearBarricades();
   playerCar.style.left = `${state.playerX}px`;
-  roadLines.forEach((line, index) => {
-    line.style.top = `${20 + index * 160}px`;
-    line.style.left = "50%";
-  });
+  state.roadLineOffset = 0;
+  renderRoadLines();
   message.innerHTML = initialMessageMarkup;
   message.classList.remove("paused-mode");
   message.classList.remove("game-over");
@@ -4140,6 +4154,22 @@ function middleLaneX() {
   return clampVehicleLeft(gameBounds.width / 2 - vehicleWidth() / 2, vehicleWidth());
 }
 
+function renderRoadLines() {
+  const cycleHeight = roadLines.length * roadLineSpacing;
+  if (!cycleHeight) {
+    return;
+  }
+
+  roadLines.forEach((line, index) => {
+    let top = roadLineStartTop + index * roadLineSpacing + state.roadLineOffset;
+    while (top > gameBounds.height) {
+      top -= cycleHeight;
+    }
+    line.style.top = `${top}px`;
+    line.style.left = "50%";
+  });
+}
+
 function positionsOverlap(leftA, widthA, leftB, widthB, gap = 18) {
   return !(leftA + widthA + gap < leftB || leftB + widthB + gap < leftA);
 }
@@ -5311,10 +5341,8 @@ async function initializeRun(levelNumber = 1, startScore = 0) {
   state.restartLevel = levelNumber;
   state.restartVehicle = state.selectedVehicle;
 
-  roadLines.forEach((line, index) => {
-    line.style.top = `${20 + index * 160}px`;
-    line.style.left = "50%";
-  });
+  state.roadLineOffset = 0;
+  renderRoadLines();
 
   resetEnemies();
   clearBarricades();
@@ -5378,15 +5406,17 @@ function setControlState(controlName, pressed) {
 }
 
 function updateRoadLines(deltaFrames = 1) {
-  roadLines.forEach((line, index) => {
-    const currentTop = parseFloat(line.style.top || line.offsetTop);
-    let nextTop = currentTop + state.currentSpeed * deltaFrames;
-    if (nextTop > gameBounds.height) {
-      nextTop = -100;
-    }
-    line.style.top = `${nextTop}px`;
-    line.style.left = "50%";
-  });
+  const cycleHeight = roadLines.length * roadLineSpacing;
+  if (!cycleHeight) {
+    return;
+  }
+
+  const lineSpeed =
+    state.level >= 4
+      ? state.currentSpeed
+      : Math.max(state.currentSpeed * 1.32, state.currentSpeed + 2.8);
+  state.roadLineOffset = (state.roadLineOffset + lineSpeed * deltaFrames) % cycleHeight;
+  renderRoadLines();
 }
 
 function updatePlayer(deltaFrames = 1) {
