@@ -2852,6 +2852,26 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
       ctx.fill();
     }
 
+    ctx.save();
+    ctx.filter = "blur(7px)";
+    const treePositions = [
+      [74, 540, 78],
+      [168, 470, 92],
+      [924, 520, 84],
+      [1002, 450, 96],
+      [118, 980, 88],
+      [970, 1080, 104],
+    ];
+    treePositions.forEach(([x, y, size]) => {
+      ctx.fillStyle = "rgba(86, 112, 74, 0.08)";
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.42, size * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(59, 39, 26, 0.08)";
+      ctx.fillRect(x - size * 0.06, y + size * 0.34, size * 0.12, size * 0.44);
+    });
+    ctx.restore();
+
     ctx.fillStyle = "rgba(111, 78, 55, 0.24)";
     ctx.fillRect(160, 0, 760, height);
     ctx.strokeStyle = "rgba(237, 221, 199, 0.42)";
@@ -2892,6 +2912,43 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     ctx.beginPath();
     ctx.ellipse(860, height - 28, 280, 100, 0, 0, Math.PI * 2);
     ctx.fill();
+    return;
+  }
+
+  if (levelNumber === 1) {
+    const daylightGradient = ctx.createLinearGradient(0, 0, 0, height);
+    daylightGradient.addColorStop(0, "#8fd6ff");
+    daylightGradient.addColorStop(0.36, "#bde9ff");
+    daylightGradient.addColorStop(1, "#eefbff");
+    ctx.fillStyle = daylightGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(255, 241, 188, 0.2)";
+    ctx.beginPath();
+    ctx.arc(860, 220, 210, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(129, 182, 91, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(220, height - 56, 300, 92, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(840, height - 38, 340, 104, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const lowBuildings = [180, 220, 170, 260, 210, 190, 240, 180];
+    lowBuildings.forEach((buildingHeight, index) => {
+      const x = 34 + index * 128;
+      const y = height - 170 - buildingHeight;
+      ctx.fillStyle = index % 2 === 0 ? "rgba(103, 129, 156, 0.48)" : "rgba(128, 154, 178, 0.42)";
+      ctx.fillRect(x, y, 92, buildingHeight);
+      ctx.fillStyle = "rgba(255, 252, 220, 0.2)";
+      for (let row = 0; row < 5; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+          ctx.fillRect(x + 12 + column * 24, y + 20 + row * 34, 9, 14);
+        }
+      }
+    });
     return;
   }
 
@@ -2938,32 +2995,12 @@ function drawScoreCardBackground(ctx, levelNumber, width, height) {
     return;
   }
 
-  const roadGradient = ctx.createLinearGradient(0, 0, 0, height);
-  roadGradient.addColorStop(0, "#8fd6ff");
-  roadGradient.addColorStop(0.34, "#bfe9ff");
-  roadGradient.addColorStop(1, "#f0fbff");
-  ctx.fillStyle = roadGradient;
+  const fallbackGradient = ctx.createLinearGradient(0, 0, 0, height);
+  fallbackGradient.addColorStop(0, "#8fd6ff");
+  fallbackGradient.addColorStop(0.34, "#bfe9ff");
+  fallbackGradient.addColorStop(1, "#f0fbff");
+  ctx.fillStyle = fallbackGradient;
   ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = "rgba(255, 241, 188, 0.24)";
-  ctx.beginPath();
-  ctx.arc(860, 260, 260, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(70, 70, 70, 0.86)";
-  ctx.fillRect(160, 0, 760, height);
-  ctx.strokeStyle = "rgba(245, 250, 255, 0.5)";
-  ctx.lineWidth = 16;
-  ctx.strokeRect(168, -2, 744, height + 4);
-
-  ctx.setLineDash([56, 46]);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
-  ctx.lineWidth = 12;
-  ctx.beginPath();
-  ctx.moveTo(width / 2, 0);
-  ctx.lineTo(width / 2, height);
-  ctx.stroke();
-  ctx.setLineDash([]);
 }
 
 function drawScoreCardBrandIcon(ctx, centerX, centerY, size = 140) {
@@ -3164,10 +3201,7 @@ function createScoreCardImage() {
 
   drawVehicleBadge(ctx, scoreCardVehicle);
 
-  drawThreeDText(ctx, "Vehicle", 540, 1470, "bold 44px Verdana", "#73efff", "rgba(2, 9, 18, 0.72)", "rgba(115, 239, 255, 0.12)");
   drawFittedCenteredThreeDText(ctx, prettifyVehicleName(scoreCardVehicle), 540, 1530, 520, 58, 34, "#f7fff7", "rgba(3, 10, 18, 0.72)", "rgba(255, 255, 255, 0.08)");
-
-  drawThreeDText(ctx, "Level", 540, 1615, "bold 40px Verdana", "#ffd166", "rgba(61, 31, 0, 0.72)", "rgba(255, 209, 102, 0.1)");
   drawThreeDText(ctx, `Level ${scoreCardLevel}`, 540, 1688, "bold 64px Verdana", "#f7fff7", "rgba(3, 10, 18, 0.75)", "rgba(255, 255, 255, 0.08)");
 
   return canvas;
