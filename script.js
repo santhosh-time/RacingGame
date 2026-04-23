@@ -200,6 +200,7 @@ const state = {
   nextRescueMissileAt: 0,
   bossDirection: 1,
   bossDefeated: false,
+  rescueArrivalPlayed: false,
   invincibleUntil: 0,
   levelFourSelectionOpen: false,
   pointer: {
@@ -3912,6 +3913,50 @@ function playBossMissileLaunchSound() {
   }, 70);
 }
 
+function playRescueMissileLaunchSound() {
+  playToneSweep({
+    category: "background",
+    type: "triangle",
+    startFrequency: 420,
+    endFrequency: 960,
+    duration: 0.14,
+    volume: 0.52,
+  });
+
+  window.setTimeout(() => {
+    playToneSweep({
+      category: "background",
+      type: "sine",
+      startFrequency: 760,
+      endFrequency: 1280,
+      duration: 0.12,
+      volume: 0.42,
+    });
+  }, 60);
+}
+
+function playRescueArrivalTheme() {
+  const notes = [
+    { start: 320, end: 540, delay: 0, duration: 0.22, volume: 0.48 },
+    { start: 460, end: 760, delay: 170, duration: 0.24, volume: 0.54 },
+    { start: 620, end: 980, delay: 360, duration: 0.26, volume: 0.6 },
+    { start: 780, end: 1220, delay: 580, duration: 0.3, volume: 0.66 },
+  ];
+
+  notes.forEach((note) => {
+    window.setTimeout(() => {
+      playToneSweep({
+        category: "background",
+        type: "sine",
+        startFrequency: note.start,
+        endFrequency: note.end,
+        duration: note.duration,
+        volume: note.volume,
+      });
+    }, note.delay);
+  });
+}
+
 function playFinalLevelVoice() {
   if (!state.backgroundSoundEnabled || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
     return Promise.resolve();
@@ -4334,6 +4379,7 @@ function clearBossPhase() {
   clearRescueMissiles();
   state.nextBossMissileAt = 0;
   state.bossDefeated = false;
+  state.rescueArrivalPlayed = false;
   stopBossCraftSound();
 }
 
@@ -4372,6 +4418,10 @@ function ensureRescueCraft() {
     gameArea.appendChild(rescueCraft);
     state.rescueCraft = rescueCraft;
     state.nextRescueMissileAt = Date.now() + 260;
+    if (!state.rescueArrivalPlayed) {
+      playRescueArrivalTheme();
+      state.rescueArrivalPlayed = true;
+    }
   }
 }
 
@@ -4389,6 +4439,7 @@ function launchRescueMissile() {
   missile.style.top = `${rescueTop - 8}px`;
   gameArea.appendChild(missile);
   state.rescueMissiles.push(missile);
+  playRescueMissileLaunchSound();
 }
 
 function respawnEnemy(enemy, respawnTop, forcePlayerLane = false) {
@@ -4908,7 +4959,7 @@ async function showFinalLevelStoryDialog() {
         <div class="story-bubble story-bubble-right" id="storyBubbleUfo"></div>
         <div class="story-bubble story-bubble-left" id="storyBubblePlayer"></div>
       </div>
-      <button class="auth-button hidden" type="button" id="storyContinueButton">Continue To Final Level</button>
+      <button class="auth-button hidden" type="button" id="storyContinueButton">Begin the Space Journey!</button>
     </div>
   `;
   syncVehiclePreviewVisibility();
@@ -4926,17 +4977,19 @@ async function showFinalLevelStoryDialog() {
   await typeStoryMessage(playerBubble, playerTextPlain, 22);
   continueButton?.classList.remove("hidden");
 
-  await new Promise((resolve) => {
-    continueButton?.addEventListener("click", () => {
-      playClickSound();
+  return new Promise((resolve) => {
+    continueButton?.addEventListener("click", async () => {
+      playUiTapSound();
       continueButton.disabled = true;
       continueButton.textContent = "Opening Final Level...";
-      resolve();
+      message.classList.remove("story-mode");
+      syncVehiclePreviewVisibility();
+      message.innerHTML = "";
+      await new Promise((resume) => window.setTimeout(resume, 40));
+      const selectedVehicle = await showLevelFourSelection(7);
+      resolve(selectedVehicle);
     }, { once: true });
   });
-
-  message.classList.remove("story-mode");
-  syncVehiclePreviewVisibility();
 }
 
 function displayLevelName(levelNumber) {
@@ -5625,10 +5678,11 @@ async function gameLoop(frameTime = performance.now()) {
     stopBossCraftSound();
     stopWaterSound();
     clearBooster();
+    clearMissiles();
+    clearBarricades();
     await playLevelUpSound(7);
-    await showFinalLevelStoryDialog();
+    const selectedUfo = await showFinalLevelStoryDialog();
     clearBossPhase();
-    const selectedUfo = await showLevelFourSelection(7);
     applyVehicleSelection(selectedUfo || "ufo-metal");
     await beginLevel(7, true);
     return;
