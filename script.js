@@ -2506,7 +2506,9 @@ function vehicleAccentColor(vehicleName = state.selectedVehicle) {
 function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
   const accent = vehicleAccentColor(vehicleName);
   const isBike = vehicleName.startsWith("bike-");
-  const isJet = vehicleName.startsWith("jet-") || vehicleName.startsWith("plane-") || vehicleName.startsWith("ufo-");
+  const isBoat = vehicleName.startsWith("jet-");
+  const isPlane = vehicleName.startsWith("plane-");
+  const isUfo = vehicleName.startsWith("ufo-");
   const isTruck = vehicleName === "car-truck";
   const isElectric = vehicleName.includes("electric");
   const isMuscle = vehicleName === "car-muscle";
@@ -2560,7 +2562,7 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
       ctx.fillStyle = "#3a2610";
       ctx.fillRect(-28, 48, 56, 30);
     }
-  } else if (isJet) {
+  } else if (isBoat) {
     ctx.fillStyle = accent;
     ctx.beginPath();
     ctx.moveTo(0, -140);
@@ -2595,6 +2597,96 @@ function drawVehicleBadge(ctx, vehicleName = state.selectedVehicle) {
     ctx.lineTo(-28, 100);
     ctx.closePath();
     ctx.fill();
+  } else if (isPlane) {
+    const planeBody = vehicleName === "plane-golden" ? "#ffd166" : vehicleName === "plane-stealth" ? "#aeb8c8" : "#83d4ff";
+    const wingShade = vehicleName === "plane-golden" ? "#fff1bf" : vehicleName === "plane-stealth" ? "#e2e7ef" : "#e6f7ff";
+
+    ctx.fillStyle = planeBody;
+    ctx.beginPath();
+    ctx.moveTo(0, -164);
+    ctx.lineTo(34, -116);
+    ctx.lineTo(48, -24);
+    ctx.lineTo(114, 24);
+    ctx.lineTo(92, 48);
+    ctx.lineTo(34, 28);
+    ctx.lineTo(34, 142);
+    ctx.lineTo(12, 164);
+    ctx.lineTo(-12, 164);
+    ctx.lineTo(-34, 142);
+    ctx.lineTo(-34, 28);
+    ctx.lineTo(-92, 48);
+    ctx.lineTo(-114, 24);
+    ctx.lineTo(-48, -24);
+    ctx.lineTo(-34, -116);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = wingShade;
+    ctx.beginPath();
+    ctx.moveTo(-122, 12);
+    ctx.lineTo(122, 12);
+    ctx.lineTo(82, 56);
+    ctx.lineTo(-82, 56);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-72, -82);
+    ctx.lineTo(72, -82);
+    ctx.lineTo(28, -36);
+    ctx.lineTo(-28, -36);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(12, 28, 44, 0.24)";
+    ctx.fillRect(-7, -120, 14, 238);
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+    ctx.beginPath();
+    ctx.roundRect(-12, -138, 24, 44, 8);
+    ctx.fill();
+  } else if (isUfo) {
+    const domeColor = vehicleName === "ufo-mercury" ? "#ffb0ff" : "#dfeaf4";
+    const saucerColor = vehicleName === "ufo-mercury" ? "#a94fe0" : "#8ea2b8";
+    const rimGlow = vehicleName === "ufo-mercury" ? "rgba(255, 143, 244, 0.34)" : "rgba(175, 219, 255, 0.26)";
+
+    ctx.fillStyle = rimGlow;
+    ctx.beginPath();
+    ctx.ellipse(0, 56, 154, 46, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = saucerColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 62, 128, 42, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const metallicGradient = ctx.createLinearGradient(0, -18, 0, 112);
+    metallicGradient.addColorStop(0, domeColor);
+    metallicGradient.addColorStop(0.5, vehicleName === "ufo-mercury" ? "#d978ff" : "#aabed2");
+    metallicGradient.addColorStop(1, vehicleName === "ufo-mercury" ? "#6c2bb2" : "#5a6774");
+    ctx.fillStyle = metallicGradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 52, 108, 28, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 56, 60, 0, Math.PI, 0, true);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = domeColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 44, 48, 0, Math.PI, 0, true);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+    for (let index = -2; index <= 2; index += 1) {
+      ctx.beginPath();
+      ctx.arc(index * 34, 76, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     ctx.fillStyle = accent;
     ctx.beginPath();
@@ -6059,6 +6151,23 @@ touchHoldButtons.forEach((button) => {
       updateWaterSound();
     }
   }, { passive: true });
+});
+
+document.addEventListener("gesturestart", (event) => {
+  event.preventDefault();
+});
+
+document.addEventListener("touchmove", (event) => {
+  if (event.touches.length > 1) {
+    event.preventDefault();
+  }
+}, { passive: false });
+
+document.addEventListener("contextmenu", (event) => {
+  if (event.target.closest("input, textarea")) {
+    return;
+  }
+  event.preventDefault();
 });
 
 document.addEventListener("click", (event) => {
