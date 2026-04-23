@@ -6034,10 +6034,10 @@ function endGame(title = "Crash!") {
             <span>Donation Amount (Rs.)</span>
             <input id="gameOverDonationAmountInput" type="number" min="1" step="1" value="11" placeholder="Enter amount">
           </label>
-          <div class="donation-button-row">
-            <button id="gameOverDonationButton" class="auth-button primary" type="button">Donate</button>
-            <button id="gameOverUpiButton" class="auth-button secondary" type="button">Pay via UPI</button>
-          </div>
+            <div class="donation-button-row">
+              <button id="gameOverUpiButton" class="auth-button secondary" type="button">Pay via UPI</button>
+              <button id="gameOverDonationButton" class="auth-button primary" type="button">Donate</button>
+            </div>
         </div>
       </div>
       <p>Start a fresh run and choose your vehicle again whenever you are ready.</p>

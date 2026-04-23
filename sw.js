@@ -1,4 +1,4 @@
-const CACHE_NAME = "viral-racing-shell-v3";
+const CACHE_NAME = "viral-racing-shell-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
