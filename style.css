@@ -1557,11 +1557,13 @@ body.is-playing .game-area {
   min-height: 100%;
   width: 100%;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
   align-content: start;
   justify-items: center;
   gap: 18px;
   padding: 24px 24px 40px;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .level-four-panel h2 {
@@ -1609,7 +1611,6 @@ body.is-playing .game-area {
 
 .selection-choice-columns {
   width: min(100%, 520px);
-  max-height: min(100%, calc(100dvh - 270px));
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
@@ -1619,7 +1620,7 @@ body.is-playing .game-area {
 
 .selection-choice-column {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   align-content: start;
   gap: 12px;
   width: 100%;
@@ -1642,9 +1643,6 @@ body.is-playing .game-area {
 
 .section-grid {
   width: 100%;
-  max-height: 250px;
-  overflow-y: auto;
-  padding-right: 6px;
 }
 
 .countdown-eyebrow {
