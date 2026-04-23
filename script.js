@@ -6088,7 +6088,14 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("wheel", (event) => {
-  if (document.body.classList.contains("is-playing")) {
+  const gameplayWheelLocked =
+    document.body.classList.contains("is-playing")
+    && !state.levelFourSelectionOpen
+    && !message.classList.contains("game-over")
+    && !message.classList.contains("paused-mode")
+    && !message.classList.contains("story-mode");
+
+  if (gameplayWheelLocked) {
     event.preventDefault();
   }
 }, { passive: false });
